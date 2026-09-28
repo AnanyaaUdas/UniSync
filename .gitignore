@@ -7,3 +7,10 @@ __MACOSX/
 ._*
 .DS_Store
 .env
+
+# python backend
+.venv/
+__pycache__/
+
+backend/quiz_cache/
+backend/.env
