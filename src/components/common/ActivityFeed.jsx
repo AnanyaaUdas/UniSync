@@ -29,7 +29,7 @@ export default function ActivityFeed({ items, footer, bare = false }) {
         {shown.map((item) => (
           <div key={item.id} className={`flex gap-3 p-2 rounded-xl ${seen.current.has(item.id) ? '' : 'flash'}`}>
             <Avatar id={item.who} size={30} showOnline />
-            <div className="text-[13px] leading-snug min-w-0">
+            <div className="text-[13px] leading-snug min-w-0 [overflow-wrap:anywhere]">
               <span className="font-semibold">{item.who === me ? 'You' : firstName(displayName(userById({ users }, item.who)))}</span>{' '}
               <RichText text={item.act} />
               <div className="text-[11px] mt-0.5 muted">{timeAgo(item.at, now)}</div>

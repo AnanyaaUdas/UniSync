@@ -45,7 +45,8 @@ async function filesFromDrop(dataTransfer) {
 // hidden system files like .DS_Store or ~$word temp files
 const isJunk = (file) => /^\.|~\$|thumbs\.db/i.test(file.name);
 
-export default function FolderDrop({ icon, title, desc, files, onFiles }) {
+// images: also allow photos (jpg, png). used for the timetable and exam routine
+export default function FolderDrop({ icon, title, desc, files, onFiles, images = false }) {
   const [dragOver, setDragOver] = useState(false);
   const folderInput = useRef();
   const fileInput = useRef();
@@ -88,9 +89,9 @@ export default function FolderDrop({ icon, title, desc, files, onFiles }) {
             Choose files
           </button>
         </div>
-        <div className="text-[11.5px] mt-3 muted">or drag and drop a folder here · PDF, DOCX, TXT, CSV</div>
+        <div className="text-[11.5px] mt-3 muted">or drag and drop a folder here · PDF, PPTX, DOCX, TXT, CSV{images ? ' or a photo (JPG, PNG)' : ''}</div>
         <input ref={folderInput} type="file" className="hidden" webkitdirectory="" multiple onChange={(e) => choose(e.target.files)} />
-        <input ref={fileInput} type="file" className="hidden" multiple accept=".pdf,.docx,.txt,.csv,.md" onChange={(e) => choose(e.target.files)} />
+        <input ref={fileInput} type="file" className="hidden" multiple accept={'.pdf,.pptx,.docx,.txt,.csv,.md' + (images ? ',.jpg,.jpeg,.png,.webp' : '')} onChange={(e) => choose(e.target.files)} />
       </div>
 
       {files.length > 0 && (
