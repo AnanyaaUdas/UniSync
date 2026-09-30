@@ -1,18 +1,18 @@
 // setup page after signing up (also opens again from "upload folders").
-// step 1: modules folder, step 2: exam folder, step 3: read the files,
-// step 4: the student checks everything before it is saved
+// step 1: modules folder, step 2: class timetable, step 3: exam folder,
+// step 4: read the files, step 5: the student checks everything before it is saved
 import React, { useState } from 'react';
 import FolderDrop from '../common/FolderDrop';
 import Icon from '../common/Icon';
 import { Logo } from '../common/ui';
-import { api, DEMO_MODE } from '../../services/api';
+import { api } from '../../services/api';
 import { update, logPersonal, setSession } from '../../store/db';
-import { sampleAcademicData } from '../../store/seed';
 import { DEADLINE_KINDS, PALETTE } from '../../lib/constants';
 import { uid, fmtDate, daysTo, dayFromNow } from '../../lib/format';
 import { applyTeamProjects } from '../../services/projectGenerator';
+import { DAYS, REMIND_AT } from '../../lib/classes';
 
-const STEPS = ['Modules folder', 'Exam schedule', 'AI analysis', 'Review'];
+const STEPS = ['Modules folder', 'Class timetable', 'Exam schedule', 'AI analysis', 'Review'];
 
 // "1 file" / "3 files"
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -29,20 +29,21 @@ const newModule = (code, name, count) => ({
 export default function Onboarding({ user, reimport = false, onClose }) {
   const [step, setStep] = useState(0);
   const [moduleFiles, setModuleFiles] = useState([]);
+  const [timetableFiles, setTimetableFiles] = useState([]);
   const [examFiles, setExamFiles] = useState([]);
   const [log, setLog] = useState([]);
   const [percent, setPercent] = useState(0);
-  const [result, setResult] = useState(null); // { modules, deadlines, exams, warnings }
+  const [result, setResult] = useState(null); // { modules, deadlines, exams, classes, warnings }
   const [error, setError] = useState('');
 
   const addLog = (icon, text) => setLog((old) => [...old, { id: uid('log'), icon, text }]);
 
   async function readFiles() {
-    setStep(2);
+    setStep(3);
     setLog([]);
     setPercent(0);
     setError('');
-    const total = moduleFiles.length + examFiles.length || 1;
+    const total = moduleFiles.length + timetableFiles.length + examFiles.length || 1;
 
     try {
       // 1. module files
@@ -57,13 +58,24 @@ export default function Onboarding({ user, reimport = false, onClose }) {
       mod.modules.forEach((m) => addLog('book', `Module found: ${m.code} · ${m.name}`));
       addLog('clock', `${plural(mod.deadlines.length, 'deadline')} found`);
 
-      // 2. exam files
+      // 2. class timetable
+      let tt = { classes: [], warnings: [] };
+      if (timetableFiles.length) {
+        addLog('scan', `Reading class timetable (${plural(timetableFiles.length, 'file')})…`);
+        tt = await api.parseTimetable(timetableFiles, (i, name) => {
+          addLog('calendar', `Reading ${name}`);
+          setPercent(Math.round(((moduleFiles.length + i) / total) * 100));
+        }, mod.modules);
+        addLog('clock', `${tt.classes.length} ${tt.classes.length === 1 ? 'class' : 'classes'} a week found`);
+      }
+
+      // 3. exam files
       let ex = { exams: [], deadlines: [], warnings: [] };
       if (examFiles.length) {
         addLog('scan', `Reading exam routine (${plural(examFiles.length, 'file')})…`);
         ex = await api.parseExams(examFiles, (i, name) => {
           addLog('calendar', `Reading ${name}`);
-          setPercent(Math.round(((moduleFiles.length + i) / total) * 100));
+          setPercent(Math.round(((moduleFiles.length + timetableFiles.length + i) / total) * 100));
         }, mod.modules);
         addLog('cap', `${plural(ex.exams.length, 'exam')} found`);
         if (ex.deadlines.length) addLog('clock', `${plural(ex.deadlines.length, 'coursework date')} found in the routine`);
@@ -98,24 +110,12 @@ export default function Onboarding({ user, reimport = false, onClose }) {
       addLog('checkCircle', 'Done. Please check what was found.');
       setPercent(100);
 
-      setResult({ modules, deadlines, exams: ex.exams, warnings: [...mod.warnings, ...ex.warnings] });
-      setTimeout(() => setStep(3), 700);
+      setResult({ modules, deadlines, exams: ex.exams, classes: tt.classes, warnings: [...mod.warnings, ...tt.warnings, ...ex.warnings] });
+      setTimeout(() => setStep(4), 700);
     } catch (e) {
       console.error(e);
       setError(e.message || 'Could not read these files.');
     }
-  }
-
-  function loadSample() {
-    const s = sampleAcademicData();
-    setResult({
-      modules: s.modules,
-      deadlines: s.deadlines.map((t) => ({ ...t, keep: true, confidence: 'sample' })),
-      exams: s.exams.map((e) => ({ ...e, keep: true })),
-      warnings: [],
-      sample: true,
-    });
-    setStep(3);
   }
 
   // save everything the student kept
@@ -167,15 +167,23 @@ export default function Onboarding({ user, reimport = false, onClose }) {
       const exams = result.exams.filter((x) => x.keep).map((e) => ({ ...e, keep: undefined }));
       db.exams[me] = [...(db.exams[me] || []), ...exams].sort((a, b) => (a.date < b.date ? -1 : 1));
 
+      // weekly classes. a class on the same day and time is not added twice
+      db.classes = db.classes || {};
+      const saved = db.classes[me] || [];
+      const fresh = (result.classes || [])
+        .filter((c) => c.keep && c.title.trim() && !saved.some((x) => x.day === c.day && x.start === c.start && x.title.toLowerCase() === c.title.toLowerCase()))
+        .map((c) => ({ ...c, keep: undefined, day: Number(c.day) }));
+      db.classes[me] = [...saved, ...fresh];
+
       // keep a list of the uploaded files for the schedule page
       db.docs[me] = db.docs[me] || [];
-      const uploaded = [...moduleFiles.map((f) => [f, 'Module']), ...examFiles.map((f) => [f, 'Exam schedule'])];
+      const uploaded = [...moduleFiles.map((f) => [f, 'Module']), ...timetableFiles.map((f) => [f, 'Class timetable']), ...examFiles.map((f) => [f, 'Exam schedule'])];
       uploaded.forEach(([f, kind]) => {
         db.docs[me].unshift({ id: uid('doc'), name: f.webkitRelativePath || f.name, size: (f.size / 1024 / 1024).toFixed(2) + ' MB', at: Date.now(), kind });
       });
 
-      const what = `**${result.modules.length} modules**, **${tasks.length} individual deadlines**, **${projectCount} group projects** and **${exams.length} exams**`;
-      logPersonal(db, me, result.sample ? `loaded sample data: ${what}` : `imported ${what}`);
+      const what = `**${result.modules.length} modules**, **${tasks.length} individual deadlines**, **${projectCount} group projects**, **${fresh.length} weekly classes** and **${exams.length} exams**`;
+      logPersonal(db, me, `imported ${what}`);
     });
     if (onClose) onClose();
   }
@@ -196,13 +204,16 @@ export default function Onboarding({ user, reimport = false, onClose }) {
       <main className="max-w-[980px] mx-auto px-4 sm:px-6 py-8">
         <div className="mb-6">
           <div className="text-[12px] font-bold text-indigo-600">{reimport ? 'RE-IMPORT' : `WELCOME, ${user.name.split(' ')[0].toUpperCase()}`}</div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1">Let's set up your semester</h1>
-          <p className="text-[14px] mt-1 muted">Upload your modules folder and exam schedule folder. UniSync reads them and builds your modules, deadlines and exam alarms. You check everything before it's saved.</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1">{reimport ? 'Add more files' : "Let's set up your semester"}</h1>
+          <p className="text-[14px] mt-1 muted">{reimport
+            ? 'Upload only what is new: module files, your class timetable or your exam schedule. Skip the steps you do not need (or click a step above to jump to it). What you already have is kept.'
+            : "Upload your modules folder, class timetable and exam schedule. UniSync reads them and builds your modules, deadlines, class reminders and exam alarms. You check everything before it's saved."}</p>
         </div>
 
-        <ol className="grid grid-cols-4 gap-2 mb-6">
+        <ol className="grid grid-cols-5 gap-2 mb-6">
           {STEPS.map((name, i) => (
-            <li key={name} className="flex flex-col gap-1.5">
+            <li key={name} onClick={() => reimport && i < 3 && step < 3 && setStep(i)}
+              className={`flex flex-col gap-1.5 ${reimport && i < 3 && step < 3 ? 'cursor-pointer' : ''}`}>
               <div className={`h-1.5 rounded-full ${i <= step ? 'grad' : ''}`} style={i <= step ? {} : { background: 'var(--track)' }} />
               <div className={`text-[11.5px] font-bold ${i === step ? 'text-indigo-700' : 'muted'}`}><span className="hidden sm:inline">{i + 1}. </span>{name}</div>
             </li>
@@ -215,7 +226,10 @@ export default function Onboarding({ user, reimport = false, onClose }) {
               desc="The folder with your module outlines, syllabi, assignment briefs and coursework specs. One sub folder per module works best, e.g. Modules/CS3040 Software Engineering/brief.pdf"
               files={moduleFiles} onFiles={setModuleFiles} />
             <div className="flex flex-wrap gap-2 justify-between items-center">
-              <button onClick={loadSample} className="btn px-4 py-2.5 rounded-xl border line bg-white text-[13px] font-bold">Skip, use sample data</button>
+              {/* when adding files later you can skip the parts you already have */}
+              {reimport
+                ? <button onClick={() => setStep(1)} className="btn px-4 py-2.5 rounded-xl border line bg-white text-[13px] font-bold">Skip, no new module files</button>
+                : <span />}
               <button disabled={!moduleFiles.length} onClick={() => setStep(1)} className="btn px-5 py-2.5 rounded-xl grad text-white text-[13px] font-bold disabled:opacity-50 inline-flex items-center gap-2">
                 Continue <Icon name="arrowRight" size={16} />
               </button>
@@ -225,15 +239,34 @@ export default function Onboarding({ user, reimport = false, onClose }) {
 
         {step === 1 && (
           <div className="fade space-y-4">
-            <FolderDrop icon="calendar" title="Upload your exam schedule folder"
-              desc="Your exam routine or timetable files (term, mid-term or final). Each subject, date, time and room is picked out."
-              files={examFiles} onFiles={setExamFiles} />
+            <FolderDrop icon="clock" title="Upload your class timetable"
+              desc={`Your weekly class routine. The day, time, module and room of every class is picked out, and at ${REMIND_AT} each evening UniSync reminds you of the classes you have the next day.`}
+              files={timetableFiles} onFiles={setTimetableFiles} images />
             <div className="flex flex-wrap gap-2 justify-between">
               <button onClick={() => setStep(0)} className="btn px-4 py-2.5 rounded-xl border line bg-white text-[13px] font-bold inline-flex items-center gap-2">
                 <Icon name="arrowLeft" size={16} /> Back
               </button>
               <div className="flex gap-2">
-                {!examFiles.length && <button onClick={readFiles} className="btn px-4 py-2.5 rounded-xl border line bg-white text-[13px] font-bold">I don't have it yet</button>}
+                {!timetableFiles.length && <button onClick={() => setStep(2)} className="btn px-4 py-2.5 rounded-xl border line bg-white text-[13px] font-bold">{reimport ? 'Skip, no new timetable' : "I don't have it yet"}</button>}
+                <button disabled={!timetableFiles.length} onClick={() => setStep(2)} className="btn px-5 py-2.5 rounded-xl grad text-white text-[13px] font-bold disabled:opacity-50 inline-flex items-center gap-2">
+                  Continue <Icon name="arrowRight" size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="fade space-y-4">
+            <FolderDrop icon="calendar" title="Upload your exam schedule folder"
+              desc="Your exam routine or timetable files (term, mid-term or final). Each subject, date, time and room is picked out."
+              files={examFiles} onFiles={setExamFiles} images />
+            <div className="flex flex-wrap gap-2 justify-between">
+              <button onClick={() => setStep(1)} className="btn px-4 py-2.5 rounded-xl border line bg-white text-[13px] font-bold inline-flex items-center gap-2">
+                <Icon name="arrowLeft" size={16} /> Back
+              </button>
+              <div className="flex gap-2">
+                {!examFiles.length && (moduleFiles.length > 0 || timetableFiles.length > 0 || !reimport) && <button onClick={readFiles} className="btn px-4 py-2.5 rounded-xl border line bg-white text-[13px] font-bold">{reimport ? 'Skip, no new exam files' : "I don't have it yet"}</button>}
                 <button disabled={!examFiles.length} onClick={readFiles} className="btn px-5 py-2.5 rounded-xl grad text-white text-[13px] font-bold disabled:opacity-50 inline-flex items-center gap-2">
                   <Icon name="scan" size={16} /> Analyse files
                 </button>
@@ -242,13 +275,13 @@ export default function Onboarding({ user, reimport = false, onClose }) {
           </div>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <div className="fade card p-6">
             <div className="flex items-center gap-3 mb-4">
               {error ? <Icon name="alert" size={30} className="text-rose-600" /> : <span className="w-9 h-9 rounded-full border-[3px] border-indigo-200 border-t-indigo-600 spin" />}
               <div className="flex-1">
                 <div className="font-extrabold">{error ? 'Something went wrong' : 'Analysing your files'}</div>
-                <div className="text-[12.5px] muted">{error || `${DEMO_MODE ? 'Running in your browser (demo mode)' : 'Processing on the UniSync server'} · ${percent}%`}</div>
+                <div className="text-[12.5px] muted">{error || `Reading your files · ${percent}%`}</div>
               </div>
             </div>
             <div className="h-2 rounded-full mb-4" style={{ background: 'var(--soft2)' }}>
@@ -267,7 +300,7 @@ export default function Onboarding({ user, reimport = false, onClose }) {
           </div>
         )}
 
-        {step === 3 && result && <Review result={result} setResult={setResult} onBack={() => setStep(result.sample ? 0 : 1)} onConfirm={save} />}
+        {step === 4 && result && <Review result={result} setResult={setResult} onBack={() => setStep(2)} onConfirm={save} />}
       </main>
     </div>
   );
@@ -277,6 +310,7 @@ export default function Onboarding({ user, reimport = false, onClose }) {
 // switch an item between individual and group before saving
 function Review({ result, setResult, onBack, onConfirm }) {
   const { modules, deadlines, exams, warnings } = result;
+  const classes = result.classes || [];
   const setList = (key, list) => setResult({ ...result, [key]: list });
   const editItem = (key, id, change) => setList(key, result[key].map((x) => (x.id === id ? { ...x, ...change } : x)));
   const keptCount = deadlines.filter((d) => d.keep).length;
@@ -289,6 +323,11 @@ function Review({ result, setResult, onBack, onConfirm }) {
   function addDeadline() {
     const item = { id: uid('d-'), mod: modules[0]?.id, title: 'New deadline', due: dayFromNow(24 * 7), kind: 'assignment', confidence: 'manual', keep: true, mode: 'personal', modeReason: 'Added by you' };
     setList('deadlines', [item, ...deadlines]);
+  }
+
+  function addClass() {
+    const item = { id: uid('k-'), day: 0, start: '08:00', end: '09:30', title: modules[0]?.name || 'Class', code: modules[0]?.code || '', type: 'Lecture', room: 'TBA', keep: true };
+    setList('classes', [...classes, item]);
   }
 
   function addExam() {
@@ -318,6 +357,10 @@ function Review({ result, setResult, onBack, onConfirm }) {
               <span className="w-2.5 h-9 rounded-full shrink-0" style={{ background: m.color }} />
               <input value={m.code} onChange={(e) => editItem('modules', m.id, { code: e.target.value.toUpperCase() })} className="field field-sm !w-[92px] font-bold" aria-label="Module code" />
               <input value={m.name} onChange={(e) => editItem('modules', m.id, { name: e.target.value })} className="field field-sm flex-1 min-w-0" aria-label="Module name" />
+              <select value={m.duration || 'semester'} onChange={(e) => editItem('modules', m.id, { duration: e.target.value })} className="field field-sm !w-[118px] shrink-0" aria-label="How long the module runs">
+                <option value="semester">1 semester</option>
+                <option value="year">Year long</option>
+              </select>
               <button onClick={() => setList('modules', modules.filter((x) => x.id !== m.id))} className="text-slate-300 hover:text-rose-500 p-1" title="Remove"><Icon name="x" size={16} /></button>
             </div>
           ))}
@@ -331,7 +374,7 @@ function Review({ result, setResult, onBack, onConfirm }) {
           <span className="badge" style={{ background: '#d1fae5', color: '#047857' }}><Icon name="users" size={12} /> {plural(groupCount, 'group project')}</span>
           <button disabled={!modules.length} onClick={addDeadline} className="ml-auto text-[12.5px] font-bold text-indigo-600 disabled:opacity-40">+ Add deadline</button>
         </div>
-        {!deadlines.length && <p className="text-[13px] muted">No dated deadlines were found in the files. You can add them here or later from your board.</p>}
+        {!deadlines.length && <p className="text-[13px] muted">No coursework or deadlines were found in the files. You can add them here or later from your board.</p>}
         <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
           {deadlines.map((d) => (
             <div key={d.id} className={`grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1.6fr_1fr_130px_120px] gap-2 items-center p-2.5 rounded-xl border line ${d.keep ? '' : 'opacity-45'}`}>
@@ -340,7 +383,7 @@ function Review({ result, setResult, onBack, onConfirm }) {
               <select value={d.mod} onChange={(e) => editItem('deadlines', d.id, { mod: e.target.value })} className="field field-sm col-start-2 sm:col-start-auto">
                 {modules.map((m) => <option key={m.id} value={m.id}>{m.code} · {m.name}</option>)}
               </select>
-              <input type="date" value={d.due} onChange={(e) => editItem('deadlines', d.id, { due: e.target.value })} className="field field-sm col-start-2 sm:col-start-auto" />
+              <input type="date" value={d.due} onChange={(e) => editItem('deadlines', d.id, { due: e.target.value, dateNote: '' })} className="field field-sm col-start-2 sm:col-start-auto" />
               <select value={d.kind} onChange={(e) => editItem('deadlines', d.id, { kind: e.target.value })} className="field field-sm col-start-2 sm:col-start-auto">
                 {Object.entries(DEADLINE_KINDS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
@@ -362,13 +405,38 @@ function Review({ result, setResult, onBack, onConfirm }) {
                 {d.mode === 'team' && d.groupSize && <span className="badge" style={{ background: '#d1fae5', color: '#047857' }}>groups of {d.groupSize}</span>}
                 <span className="text-[11px] muted">
                   {d.modeReason || 'Treated as individual work'}
-                  {d.source && d.confidence !== 'sample' && d.confidence !== 'manual' ? ` · from ${d.source}` : ''}
+                  {d.source && d.confidence !== 'manual' ? ` · from ${d.source}` : ''}
                   {modules.some((m) => m.id === d.mod) ? '' : ' · pick a module'}
                 </span>
+                {d.dateNote && <span className="text-[11px] font-semibold w-full" style={{ color: '#b45309' }}>{d.dateNote}</span>}
               </div>
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="card p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="font-extrabold">Class timetable</h2>
+          <span className="badge" style={{ background: '#e0e7ff', color: '#4338ca' }}>{classes.filter((c) => c.keep).length} a week</span>
+          <button onClick={addClass} className="ml-auto text-[12.5px] font-bold text-indigo-600">+ Add class</button>
+        </div>
+        {!classes.length && <p className="text-[13px] muted">No classes yet. Add them here, or upload your timetable later from the Schedule page.</p>}
+        <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+          {classes.map((c) => (
+            <div key={c.id} className={`grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1.5fr_120px_96px_96px_1fr] gap-2 items-center p-2.5 rounded-xl border line ${c.keep ? '' : 'opacity-45'}`}>
+              <input type="checkbox" checked={c.keep} onChange={(e) => editItem('classes', c.id, { keep: e.target.checked })} className="w-4 h-4 accent-indigo-600" />
+              <input value={c.title} onChange={(e) => editItem('classes', c.id, { title: e.target.value })} className="field field-sm" aria-label="Module" />
+              <select value={c.day} onChange={(e) => editItem('classes', c.id, { day: Number(e.target.value) })} className="field field-sm col-start-2 sm:col-start-auto" aria-label="Day">
+                {DAYS.map((name, i) => <option key={name} value={i}>{name}</option>)}
+              </select>
+              <input type="time" value={c.start} onChange={(e) => editItem('classes', c.id, { start: e.target.value })} className="field field-sm col-start-2 sm:col-start-auto" aria-label="Starts" />
+              <input type="time" value={c.end} onChange={(e) => editItem('classes', c.id, { end: e.target.value })} className="field field-sm col-start-2 sm:col-start-auto" aria-label="Ends" />
+              <input value={c.room} onChange={(e) => editItem('classes', c.id, { room: e.target.value })} className="field field-sm col-start-2 sm:col-start-auto" aria-label="Room" placeholder="Room" />
+            </div>
+          ))}
+        </div>
+        {classes.length > 0 && <p className="text-[11.5px] muted mt-2">At {REMIND_AT} each evening you get a reminder of the classes you have the next day, with the time and the room.</p>}
       </section>
 
       <section className="card p-5">
