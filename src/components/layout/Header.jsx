@@ -1,17 +1,39 @@
 // top bar: logo, project picker (on the group page), page tabs,
 // group chat button, notifications and the profile picture
 import React, { useEffect, useRef, useState } from 'react';
-import { Avatar, Logo, RichText } from '../common/ui';
+import { Avatar, Logo, RichText, useNow } from '../common/ui';
 import Icon from '../common/Icon';
 import { useDB, userById, displayName } from '../../store/db';
 import { daysTo, fmtShort } from '../../lib/format';
 import { liveCall } from '../call/callActions';
+import { reportReady } from '../../services/semesterReport';
+import { DAYS, REMIND_AT, classesOn, tomorrow, clockOf, classTime, classPlace } from '../../lib/classes';
 
 // builds the list of notifications for the bell
-function getNotifications(d, me) {
+function getNotifications(d, me, now) {
   const list = [];
   const exams = d.exams[me] || [];
   const modules = d.modules[me] || [];
+
+  // the semester is over: the feedback report is ready
+  if (reportReady(d, me, now)) {
+    const sem = userById(d, me).sem;
+    list.push({ id: 'report' + sem, icon: 'pie', fg: '#4338ca', bg: '#e0e7ff', text: `Your **${sem} feedback report** is ready`, sub: 'Open it to see how you did and download the PDF', isReport: true });
+  }
+
+  // classes: the ones left today, and from the evening the ones tomorrow
+  const classes = d.classes?.[me] || [];
+  const time = clockOf(now);
+  const today = new Date(now);
+  classesOn(classes, today).filter((c) => (c.end || c.start) > time).forEach((c) => {
+    list.push({ id: 'class' + c.id + today.toDateString(), icon: 'calendar', fg: '#0e7490', bg: '#cffafe', text: `Class today: **${c.title}** at ${c.start}`, sub: `${classTime(c)} · ${classPlace(c)}` });
+  });
+  if (time >= (d.remind?.[me] || REMIND_AT)) {
+    const next = tomorrow(now);
+    classesOn(classes, next).forEach((c) => {
+      list.push({ id: 'class' + c.id + next.toDateString(), icon: 'calendar', fg: '#0e7490', bg: '#cffafe', text: `Class tomorrow: **${c.title}** at ${c.start}`, sub: `${DAYS[c.day]} · ${classTime(c)} · ${classPlace(c)}` });
+    });
+  }
 
   // exams in the next 10 days
   exams.forEach((e) => {
@@ -52,13 +74,14 @@ function getNotifications(d, me) {
   return list;
 }
 
-const TABS = [['personal', 'Individual'], ['team', 'Group'], ['schedule', 'Schedule']];
+const TABS = [['personal', 'Individual'], ['team', 'Group'], ['study', 'Study'], ['schedule', 'Schedule']];
 
-export default function Header({ me, view, setView, projId, setProjId, onUpload, openChat, chatCount, onJoinCall }) {
+export default function Header({ me, view, setView, projId, setProjId, onUpload, openChat, chatCount, onJoinCall, onReport }) {
   const d = useDB();
   const myProjects = d.projects.filter((p) => p.members.includes(me));
   const project = d.projects.find((p) => p.id === projId);
-  const notifications = getNotifications(d, me);
+  const now = useNow();
+  const notifications = getNotifications(d, me, now);
   const [read, setRead] = useState([]);
   const [menu, setMenu] = useState(null); // 'projects', 'bell' or null
   const headerRef = useRef();
@@ -76,7 +99,8 @@ export default function Header({ me, view, setView, projId, setProjId, onUpload,
   function clickNotification(n) {
     setRead([...read, n.id]);
     setMenu(null);
-    if (n.isCall) onJoinCall(n.projectId);
+    if (n.isReport) onReport();
+    else if (n.isCall) onJoinCall(n.projectId);
     else if (n.goSchedule) setView('schedule');
   }
 
@@ -130,9 +154,9 @@ export default function Header({ me, view, setView, projId, setProjId, onUpload,
                   );
                 })}
                 <div className="border-t line my-2" />
-                <div className="px-2.5 py-1.5 text-[11.5px] muted leading-snug">Group projects are created from your group coursework PDFs.</div>
+                <div className="px-2.5 py-1.5 text-[11.5px] muted leading-snug">Group projects are created from your group coursework files.</div>
                 <button onClick={() => { setMenu(null); onUpload(); }} className="w-full text-left px-2.5 py-2 rounded-xl text-[13px] font-bold text-indigo-600 hover:bg-indigo-50 flex items-center gap-2">
-                  <Icon name="upload" size={15} /> Upload coursework PDFs
+                  <Icon name="upload" size={15} /> Upload coursework files
                 </button>
               </div>
             )}
