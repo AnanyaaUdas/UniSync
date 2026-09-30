@@ -2,9 +2,8 @@
 import React, { useState } from 'react';
 import { ALLOWED_DOMAINS, DEPTS, SEMS, PALETTE, LMU_ID_RE } from '../../lib/constants';
 import { useDB, update, setSession } from '../../store/db';
-import { DEMO_PASSWORD } from '../../store/seed';
 import { initialsOf, uid } from '../../lib/format';
-import { Avatar, Logo } from '../common/ui';
+import { Logo } from '../common/ui';
 import { api } from '../../services/api';
 import Icon from '../common/Icon';
 
@@ -28,7 +27,6 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const users = useDB((d) => d.users);
-  const demoUsers = users.filter((u) => u.password === DEMO_PASSWORD).slice(0, 5);
   const signup = mode === 'signup';
 
   async function submit(e) {
@@ -143,22 +141,6 @@ export default function AuthPage() {
             </button>
             <p className="text-[11.5px] text-center muted">Format: <b>NP01CP4A240001@islingtoncollege.edu.np</b></p>
           </form>
-
-          {/* demo accounts: click a name to fill the form */}
-          {!signup && demoUsers.length > 0 && (
-            <div className="mt-5">
-              <div className="lbl mb-2">DEMO ACCOUNTS · PASSWORD {DEMO_PASSWORD}</div>
-              <div className="flex flex-wrap gap-2">
-                {demoUsers.map((u) => (
-                  <button key={u.id} type="button" onClick={() => { setEmail(u.email); setPassword(DEMO_PASSWORD); }}
-                    className="btn flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-xl border line bg-white text-[12.5px] font-bold">
-                    <Avatar id={u.id} size={22} ring={false} /> {u.name.split(' ')[0]}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[11.5px] muted mt-2">Tip: open a second browser tab and sign in as another student to see live activity, chat and video calls sync between them.</p>
-            </div>
-          )}
         </div>
       </div>
     </div>
