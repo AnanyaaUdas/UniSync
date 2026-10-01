@@ -7,6 +7,7 @@ import Icon from '../common/Icon';
 import { useDB, update, logTeam, userById, displayName } from '../../store/db';
 import { COLS, colById, TAG_COLORS } from '../../lib/constants';
 import { urgency, fmtDate, timeAgo, uid, firstName } from '../../lib/format';
+import { setStage } from '../../lib/progress';
 
 export default function TaskDrawer({ me, project, taskId, onClose }) {
   const d = useDB();
@@ -52,7 +53,7 @@ export default function TaskDrawer({ me, project, taskId, onClose }) {
 
   const moveTo = (col) => changeTask((t, db) => {
     if (t.col === col) return null;
-    t.col = col;
+    setStage(t, 'col', col, me);
     const owner = t.assignee !== me ? ` (${nameOf(db, t.assignee)}'s task)` : '';
     return `moved **${t.title}**${owner} to ${colById(col).name}`;
   });

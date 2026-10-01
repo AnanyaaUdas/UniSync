@@ -1,9 +1,11 @@
 // group page: kanban board for one group project, live activity,
-// the call banner and the popups to add tasks and members
-import React, { useState } from 'react';
+// the call banner and the popups to add tasks and members.
+// the tabs switch between the board, the progress charts and the canvas
+import React, { Suspense, lazy, useState } from 'react';
 import Kanban from '../common/Kanban';
 import ActivityFeed from '../common/ActivityFeed';
 import TaskDrawer from './TaskDrawer';
+import GroupProgress from './GroupProgress';
 import Icon from '../common/Icon';
 import { Avatar, Modal, ModalActions } from '../common/ui';
 import { useDB, update, logTeam, userById, displayName } from '../../store/db';
@@ -11,6 +13,12 @@ import { useOnline } from '../../store/presence';
 import { colById, TAGS, TAG_COLORS } from '../../lib/constants';
 import { urgency, fmtShort, dayFromNow, firstName, uid } from '../../lib/format';
 import { liveCall } from '../call/callActions';
+import { setStage } from '../../lib/progress';
+
+// the canvas is only downloaded when someone opens it, so the app stays fast
+const CanvasBoard = lazy(() => import('../canvas/CanvasBoard'));
+
+const PAGES = [['board', 'Board', 'board'], ['progress', 'Progress', 'pie'], ['canvas', 'Canvas', 'shapes']];
 
 export default function TeamView({ me, projId, openChat, startCall, onUpload }) {
   const d = useDB();
@@ -19,15 +27,16 @@ export default function TeamView({ me, projId, openChat, startCall, onUpload }) 
   const [filter, setFilter] = useState('all'); // show everyone's tasks or one member's
   const [openTask, setOpenTask] = useState(null);
   const [popup, setPopup] = useState(null); // 'task', 'member' or null
+  const [page, setPage] = useState('board'); // board, progress or canvas
 
   if (!project) {
     return (
       <main className="max-w-[900px] mx-auto px-4 py-16 text-center">
         <div className="w-14 h-14 rounded-2xl mx-auto mb-3 grid place-items-center text-indigo-600" style={{ background: 'var(--tint)' }}><Icon name="users" size={26} /></div>
         <h1 className="text-2xl font-extrabold">No group coursework yet</h1>
-        <p className="muted mt-2 text-[14px] max-w-md mx-auto">Group projects are created automatically. Upload your module briefs or coursework dates PDF and UniSync will create a project for every piece of group coursework it finds.</p>
+        <p className="muted mt-2 text-[14px] max-w-md mx-auto">Group projects are created automatically. Upload your module briefs, slides or coursework dates and UniSync will create a project for every piece of group coursework it finds. Then add your group with + Member.</p>
         <button onClick={onUpload} className="btn mt-5 px-5 py-3 rounded-xl grad text-white font-bold text-[13px] inline-flex items-center gap-2">
-          <Icon name="upload" size={16} /> Upload coursework PDFs
+          <Icon name="upload" size={16} /> Upload coursework files
         </button>
       </main>
     );
@@ -43,7 +52,7 @@ export default function TeamView({ me, projId, openChat, startCall, onUpload }) 
     update((db) => {
       const task = db.projects.find((p) => p.id === project.id).tasks.find((t) => t.id === taskId);
       if (!task || task.col === col) return;
-      task.col = col;
+      setStage(task, 'col', col, me);
       const owner = task.assignee !== me ? ` (${firstName(displayName(userById(db, task.assignee)))}'s task)` : '';
       logTeam(db, project.id, me, `moved **${task.title}**${owner} to ${colById(col).name}`);
     });
@@ -110,7 +119,24 @@ export default function TeamView({ me, projId, openChat, startCall, onUpload }) 
         </div>
       )}
 
-      <div className="grid xl:grid-cols-4 gap-5">
+      <nav className="inline-flex p-1 rounded-xl mb-5" style={{ background: 'var(--soft2)' }}>
+        {PAGES.map(([key, label, icon]) => (
+          <button key={key} onClick={() => setPage(key)}
+            className={`btn px-3.5 py-1.5 rounded-lg text-[13px] font-bold inline-flex items-center gap-1.5 ${page === key ? 'bg-white shadow text-indigo-700' : 'text-slate-500'}`}>
+            <Icon name={icon} size={15} /> {label}
+          </button>
+        ))}
+      </nav>
+
+      {page === 'progress' && <GroupProgress project={project} />}
+
+      {page === 'canvas' && (
+        <Suspense fallback={<div className="card p-10 text-center text-[13px] muted">Loading canvas…</div>}>
+          <CanvasBoard me={me} project={project} />
+        </Suspense>
+      )}
+
+      {page === 'board' && <div className="grid xl:grid-cols-4 gap-5">
         <div className="xl:col-span-3 min-w-0">
           <Kanban items={tasks} colOf={(t) => t.col} onMove={moveTask} renderCard={taskCard} onAdd={() => setPopup('task')} />
         </div>
@@ -124,7 +150,7 @@ export default function TeamView({ me, projId, openChat, startCall, onUpload }) 
             </button>
           </div>
         } />
-      </div>
+      </div>}
 
       {openTask && <TaskDrawer me={me} project={project} taskId={openTask} onClose={() => setOpenTask(null)} />}
       {popup === 'task' && <NewTaskPopup me={me} project={project} onClose={() => setPopup(null)} />}
@@ -197,6 +223,13 @@ function AddMemberPopup({ me, project, onClose }) {
       if (p.members.includes(id)) return;
       p.members.push(id);
       logTeam(db, project.id, me, `added **${displayName(userById(db, id))}** to the project`);
+
+      // if they uploaded the same coursework they have their own copy of this
+      // project. when nobody has worked in it yet we remove it, so they do
+      // not see the same project twice
+      const untouched = (x) => x.members.length === 1 && x.members[0] === id
+        && x.tasks.every((t) => t.col === 'todo' && !t.comments.length) && !x.chat.some((c) => !c.type);
+      db.projects = db.projects.filter((x) => x.id === p.id || x.key !== p.key || !untouched(x));
     });
     onClose();
   }
