@@ -1,6 +1,7 @@
 // individual page: my own kanban board with a side panel that shows
-// my next deadlines, exams and my activity
-import React, { useState } from 'react';
+// my next deadlines, exams and my activity. the tabs switch between the
+// board, the progress charts and my own drawing canvas
+import React, { Suspense, lazy, useState } from 'react';
 import Kanban from '../common/Kanban';
 import ActivityFeed from '../common/ActivityFeed';
 import Icon from '../common/Icon';
@@ -8,6 +9,11 @@ import { Avatar, Empty, Modal, ModalActions } from '../common/ui';
 import { useDB, update, logPersonal } from '../../store/db';
 import { COLS, colById, DEADLINE_KINDS } from '../../lib/constants';
 import { urgency, fmtShort, daysTo, dayFromNow, uid } from '../../lib/format';
+import PersonalProgress from './PersonalProgress';
+import { setStage } from '../../lib/progress';
+
+// the canvas is only downloaded when it is opened
+const PersonalCanvas = lazy(() => import('../canvas/CanvasBoard').then((file) => ({ default: file.PersonalCanvas })));
 
 const NO_MODULE = { code: 'N/A', name: 'No module', color: '#94a3b8' };
 
@@ -20,6 +26,7 @@ export default function PersonalView({ me, goSchedule }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [tab, setTab] = useState('deadlines'); // side panel tab
+  const [page, setPage] = useState('board'); // board, progress or canvas
 
   const moduleOf = (id) => modules.find((m) => m.id === id) || NO_MODULE;
   const shown = tasks.filter((t) => filter === 'all' || t.mod === filter);
@@ -35,7 +42,7 @@ export default function PersonalView({ me, goSchedule }) {
     update((db) => {
       const task = db.solo[me].find((t) => t.id === id);
       if (!task || task.status === col) return;
-      task.status = col;
+      setStage(task, 'status', col);
       logPersonal(db, me, `moved **${task.title}** to ${colById(col).name}`);
     });
   }
@@ -62,7 +69,7 @@ export default function PersonalView({ me, goSchedule }) {
       <article className="tcard bg-white border line rounded-xl p-3.5" onDoubleClick={() => setEditing(task)}>
         <div className="flex items-start gap-1.5 mb-2">
           <div className="flex flex-wrap gap-1.5 flex-1">
-            <span className="badge" style={{ background: m.color + '1a', color: m.color }}>{m.code}</span>
+            <span className="badge max-w-full" style={{ background: m.color + '1a', color: m.color }} title={`${m.code} · ${m.name}`}><span className="truncate">{m.name || m.code}</span></span>
             <span className="badge" style={{ background: u.bg, color: u.fg }}>{u.label}</span>
           </div>
           <button onClick={() => deleteTask(task)} title="Delete task" aria-label="Delete task" className="btn text-slate-300 hover:text-rose-500 p-0.5"><Icon name="x" size={15} /></button>
@@ -97,12 +104,32 @@ export default function PersonalView({ me, goSchedule }) {
         </button>
       </div>
 
+      <nav className="inline-flex p-1 rounded-xl mb-4" style={{ background: 'var(--soft2)' }}>
+        {[['board', 'Board', 'board'], ['progress', 'Progress', 'pie'], ['canvas', 'Canvas', 'shapes']].map(([key, label, icon]) => (
+          <button key={key} onClick={() => setPage(key)}
+            className={`btn px-3.5 py-1.5 rounded-lg text-[13px] font-bold inline-flex items-center gap-1.5 ${page === key ? 'bg-white shadow text-indigo-700' : 'text-slate-500'}`}>
+            <Icon name={icon} size={15} /> {label}
+          </button>
+        ))}
+      </nav>
+
+      {page === 'progress' && <PersonalProgress modules={modules} tasks={tasks} />}
+
+      {page === 'canvas' && (
+        <Suspense fallback={<div className="card p-10 text-center text-[13px] muted">Loading canvas…</div>}>
+          <PersonalCanvas me={me} />
+        </Suspense>
+      )}
+
+      {page === 'board' && <>
       {/* module filter */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
         <button onClick={() => setFilter('all')} className={`btn shrink-0 px-3.5 py-2 rounded-xl text-[12.5px] font-bold border ${filter === 'all' ? 'grad text-white border-transparent' : 'bg-white line'}`}>All modules</button>
         {modules.map((m) => {
           const on = filter === m.id;
           const left = tasks.filter((t) => t.mod === m.id && t.status !== 'done').length;
+          // a module from a closed semester with nothing left to do is not shown
+          if (m.endedIn && !left && !on) return null;
           return (
             <button key={m.id} onClick={() => setFilter(m.id)} style={on ? { background: m.color } : {}}
               className={`btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-[12.5px] font-bold border ${on ? 'text-white border-transparent' : 'bg-white line'}`}>
@@ -187,6 +214,7 @@ export default function PersonalView({ me, goSchedule }) {
           </div>
         </aside>
       </div>
+      </>}
 
       {(adding || editing) && (
         <TaskPopup me={me} modules={modules} task={editing} defaultModule={filter}
@@ -211,10 +239,15 @@ function TaskPopup({ me, modules, task, defaultModule, onClose }) {
     update((db) => {
       db.solo[me] = db.solo[me] || [];
       if (task) {
-        Object.assign(db.solo[me].find((t) => t.id === task.id), data);
+        const saved = db.solo[me].find((t) => t.id === task.id);
+        const moved = saved.status !== data.status;
+        Object.assign(saved, data);
+        if (moved) setStage(saved, 'status', data.status);
         logPersonal(db, me, `edited **${data.title}**`);
       } else {
-        db.solo[me].unshift({ id: uid('s'), source: 'manual', ...data });
+        const created = { id: uid('s'), source: 'manual', ...data };
+        setStage(created, 'status', data.status);
+        db.solo[me].unshift(created);
         logPersonal(db, me, `created **${data.title}** in ${colById(data.status).name}`);
       }
     });
