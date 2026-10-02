@@ -1,20 +1,29 @@
-// schedule page: my profile card, modules, exam dates and the files i uploaded
+// schedule page: my profile card, past semester reports, modules,
+// class timetable, exam dates and the files i uploaded
 import React, { useState } from 'react';
 import Icon from '../common/Icon';
 import { Avatar, Empty, Modal, ModalActions } from '../common/ui';
-import { useDB, update, userById, displayName, setSession, resetDemo, logPersonal } from '../../store/db';
+import { useDB, update, userById, displayName, setSession, logPersonal } from '../../store/db';
 import { daysTo, fmtDate, timeAgo, initialsOf } from '../../lib/format';
-import { DEMO_MODE } from '../../services/api';
 import { DEPTS, SEMS } from '../../lib/constants';
+import SemesterReport from '../report/SemesterReport';
+import { semesterEnd } from '../../services/semesterReport';
+import { DAYS, CLASS_TYPES, REMIND_AT, classTime, classPlace } from '../../lib/classes';
 
 export default function ProfileView({ me, onUpload }) {
   const d = useDB();
   const user = userById(d, me);
   const modules = d.modules[me] || [];
   const exams = d.exams[me] || [];
+  const classes = d.classes?.[me] || [];
+  const remindAt = d.remind?.[me] || REMIND_AT;
+  const [addingClass, setAddingClass] = useState(false);
+  const [alerts, setAlerts] = useState('Notification' in window ? Notification.permission : 'none');
   const docs = d.docs[me] || [];
   const tasks = d.solo[me] || [];
   const [editing, setEditing] = useState(false);
+  const [report, setReport] = useState(null); // a saved report, or null
+  const pastReports = d.reports?.[me] || [];
 
   const stats = [
     ['London Met ID', user.lmuId || 'n/a'],
@@ -33,6 +42,32 @@ export default function ProfileView({ me, onUpload }) {
     });
   }
 
+  // a module runs for 1 semester or for the whole year
+  function setDuration(id, duration) {
+    update((db) => {
+      db.modules[me].find((x) => x.id === id).duration = duration;
+    });
+  }
+
+  function removeClass(id) {
+    update((db) => {
+      db.classes[me] = db.classes[me].filter((x) => x.id !== id);
+    });
+  }
+
+  function setRemindAt(time) {
+    if (!time) return;
+    update((db) => {
+      db.remind = db.remind || {};
+      db.remind[me] = time;
+    });
+  }
+
+  // the browser asks the student if unisync may show notifications
+  async function allowAlerts() {
+    setAlerts(await Notification.requestPermission());
+  }
+
   function removeExam(id) {
     update((db) => {
       db.exams[me] = db.exams[me].filter((x) => x.id !== id);
@@ -43,7 +78,7 @@ export default function ProfileView({ me, onUpload }) {
     <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-7">
       <div className="mb-5">
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Profile & Schedule Hub</h1>
-        <p className="text-[14px] mt-1 muted">Your account, modules, exam routine and uploaded documents.</p>
+        <p className="text-[14px] mt-1 muted">Your account, modules, class timetable, exam routine and uploaded documents.</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
@@ -71,20 +106,34 @@ export default function ProfileView({ me, onUpload }) {
           </div>
           <button onClick={() => setEditing(true)} className="btn w-full mt-5 py-2.5 rounded-xl grad text-white text-[13px] font-bold">Edit profile</button>
           <button onClick={() => setSession(null)} className="btn w-full mt-2.5 py-2.5 rounded-xl border line text-[13px] font-bold hover:bg-rose-50 hover:text-rose-600">Log out</button>
-          {DEMO_MODE && (
-            <button onClick={() => confirm('Reset all demo data in this browser?') && resetDemo()} className="w-full mt-3 text-[11.5px] font-bold text-slate-400 hover:text-rose-500">Reset demo data</button>
-          )}
         </div>
 
         <div className="lg:col-span-2 space-y-5">
           <div className="card p-5 flex flex-wrap items-center gap-4" style={{ background: 'var(--hero)' }}>
             <div className="w-11 h-11 rounded-xl grid place-items-center bg-white text-indigo-600 border line"><Icon name="upload" size={20} /></div>
             <div className="flex-1 min-w-[200px]">
-              <div className="font-extrabold">Upload more module or exam files</div>
-              <div className="text-[12.5px] muted">Run the import again with a new modules folder or exam routine. New modules, deadlines and exams are added to what you have.</div>
+              <div className="font-extrabold">Upload more module, timetable or exam files</div>
+              <div className="text-[12.5px] muted">Run the import again with a new modules folder, class timetable or exam routine. New modules, deadlines, classes and exams are added to what you have.</div>
             </div>
             <button onClick={onUpload} className="btn px-4 py-2.5 rounded-xl grad text-white text-[13px] font-bold">Upload folders</button>
           </div>
+
+          {/* the report of this semester is not shown here. it is sent as a
+              notification when the semester ends. closed semesters stay here */}
+          {pastReports.length > 0 && (
+            <div className="card p-5">
+              <h3 className="font-bold text-[15px]">Past semester reports</h3>
+              <div className="text-[12.5px] muted mb-3">The feedback reports of the semesters you closed. Open one to download it as a PDF.</div>
+              <div className="flex flex-wrap gap-2">
+                {pastReports.map((item) => (
+                  <button key={item.id} onClick={() => setReport(item)} className="btn flex items-center gap-2 px-3 py-2 rounded-xl border line text-[12.5px] font-bold">
+                    <Icon name="notes" size={14} className="text-indigo-600" /> {item.report.semester}
+                    <span className="font-medium muted">closed {fmtDate(new Date(item.closedAt).toLocaleDateString('en-CA'))}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-3">
@@ -98,11 +147,58 @@ export default function ProfileView({ me, onUpload }) {
                   <span className="w-2.5 h-10 rounded-full" style={{ background: m.color }} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[13.5px] font-bold truncate">{m.name}</div>
-                    <div className="text-[12px] muted">{m.code} · {tasks.filter((t) => t.mod === m.id).length} tasks</div>
+                    <div className="text-[12px] muted">{m.code} · {tasks.filter((t) => t.mod === m.id).length} tasks{m.endedIn ? ` · finished in ${m.endedIn}` : ''}</div>
                   </div>
+                  <select value={m.duration || 'semester'} onChange={(e) => setDuration(m.id, e.target.value)} className="field field-sm !w-[112px] shrink-0" aria-label="How long the module runs">
+                    <option value="semester">1 semester</option>
+                    <option value="year">Year long</option>
+                  </select>
                   <button onClick={() => removeModule(m)} title="Remove module and its tasks" aria-label="Remove" className="text-slate-300 hover:text-rose-500 p-1"><Icon name="x" size={16} /></button>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <h3 className="font-bold text-[15px]">Class timetable</h3>
+              {classes.length > 0 && <span className="badge" style={{ background: '#cffafe', color: '#0e7490' }}>{classes.length} a week</span>}
+              <button onClick={() => setAddingClass(true)} className="ml-auto text-[12.5px] font-bold text-indigo-600">+ Add class</button>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-xl mb-3" style={{ background: 'var(--soft)' }}>
+              <Icon name="bell" size={16} className="text-indigo-600" />
+              <label className="text-[12.5px] flex items-center gap-2">
+                Remind me about tomorrow's classes at
+                <input type="time" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} className="field field-sm !w-[110px]" aria-label="Reminder time" />
+              </label>
+              {alerts === 'default' && <button onClick={allowAlerts} className="btn px-3 py-1.5 rounded-lg border line bg-white text-[12px] font-bold">Allow browser notifications</button>}
+              {alerts === 'granted' && <span className="badge" style={{ background: '#d1fae5', color: '#047857' }}>Browser notifications on</span>}
+              {alerts === 'denied' && <span className="text-[11.5px] muted">Browser notifications are blocked for this site, so the reminder only shows inside UniSync.</span>}
+            </div>
+            {!classes.length && <Empty>No classes yet. Upload your class timetable with Upload folders, or add your classes here.</Empty>}
+            <div className="space-y-3">
+              {DAYS.map((name, day) => {
+                const list = classes.filter((c) => c.day === day).sort((a, b) => (a.start < b.start ? -1 : 1));
+                if (!list.length) return null;
+                return (
+                  <div key={name}>
+                    <div className="lbl mb-1.5">{name.toUpperCase()}{day === new Date().getDay() ? ' · TODAY' : ''}</div>
+                    <div className="space-y-2">
+                      {list.map((c) => (
+                        <div key={c.id} className="flex flex-wrap items-center gap-3 p-3 rounded-xl border line">
+                          <div className="text-[12.5px] font-extrabold tabular-nums w-[104px]">{classTime(c)}</div>
+                          <div className="min-w-0 flex-1 basis-[150px]">
+                            <div className="text-[13.5px] font-bold truncate">{c.title}</div>
+                            <div className="text-[12px] muted">{classPlace(c)}</div>
+                          </div>
+                          {c.code && <span className="badge" style={{ background: '#e0e7ff', color: '#4338ca' }}>{c.code}</span>}
+                          <button onClick={() => removeClass(c.id)} aria-label="Remove" className="text-slate-300 hover:text-rose-500 p-1"><Icon name="x" size={16} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -156,8 +252,74 @@ export default function ProfileView({ me, onUpload }) {
         </div>
       </div>
 
+      {addingClass && <AddClass me={me} modules={modules} onClose={() => setAddingClass(false)} />}
       {editing && <EditProfile me={me} user={user} onClose={() => setEditing(false)} />}
+      {report && <SemesterReport me={me} saved={report} onClose={() => setReport(null)} />}
     </main>
+  );
+}
+
+function AddClass({ me, modules, onClose }) {
+  function submit(e) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const title = form.get('title').trim();
+    const mod = modules.find((m) => m.name.toLowerCase() === title.toLowerCase());
+    update((db) => {
+      db.classes = db.classes || {};
+      db.classes[me] = [...(db.classes[me] || []), {
+        id: 'k' + Date.now().toString(36),
+        day: Number(form.get('day')),
+        start: form.get('start'),
+        end: form.get('end'),
+        title,
+        code: mod?.code || '',
+        type: form.get('type'),
+        room: form.get('room').trim() || 'TBA',
+      }];
+    });
+    onClose();
+  }
+
+  return (
+    <Modal title="Add class" sub="A class you have every week. You get a reminder the evening before." onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <div>
+          <label className="lbl">MODULE</label>
+          <input name="title" required list="class-modules" defaultValue={modules[0]?.name} className="field mt-1.5" />
+          <datalist id="class-modules">{modules.map((m) => <option key={m.id} value={m.name} />)}</datalist>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <div>
+            <label className="lbl">DAY</label>
+            <select name="day" defaultValue={new Date().getDay()} className="field mt-1.5">
+              {DAYS.map((name, i) => <option key={name} value={i}>{name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="lbl">STARTS</label>
+            <input name="start" type="time" required defaultValue="08:00" className="field mt-1.5" />
+          </div>
+          <div>
+            <label className="lbl">ENDS</label>
+            <input name="end" type="time" required defaultValue="09:30" className="field mt-1.5" />
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="lbl">TYPE</label>
+            <select name="type" className="field mt-1.5">
+              {CLASS_TYPES.map((x) => <option key={x}>{x}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="lbl">ROOM</label>
+            <input name="room" placeholder="e.g. LT-08" className="field mt-1.5" />
+          </div>
+        </div>
+        <ModalActions onCancel={onClose} submitLabel="Add class" />
+      </form>
+    </Modal>
   );
 }
 
@@ -185,6 +347,8 @@ function resizePhoto(file, done) {
 
 function EditProfile({ me, user, onClose }) {
   const [photo, setPhoto] = useState(user.img || '');
+  const setEnd = useDB((d) => d.semEnd?.[me] || '');
+  const lastExam = useDB((d) => (d.semEnd?.[me] ? '' : semesterEnd(d, me)));
 
   function pickPhoto(e) {
     const file = e.target.files[0];
@@ -205,6 +369,10 @@ function EditProfile({ me, user, onClose }) {
       u.dept = form.get('dept');
       u.sem = form.get('sem');
       u.img = photo;
+      // empty means: use the date of the last exam
+      db.semEnd = db.semEnd || {};
+      if (form.get('semEnd')) db.semEnd[me] = form.get('semEnd');
+      else delete db.semEnd[me];
     });
     onClose();
   }
@@ -242,6 +410,14 @@ function EditProfile({ me, user, onClose }) {
               {SEMS.map((x) => <option key={x}>{x}</option>)}
             </select>
           </div>
+        </div>
+        <div>
+          <label className="lbl">SEMESTER ENDS ON</label>
+          <input name="semEnd" type="date" defaultValue={setEnd} className="field mt-1.5" />
+          <p className="text-[11.5px] muted mt-1.5">
+            Your feedback report is sent to you as a notification the day after this date.
+            {setEnd ? '' : lastExam ? ` Left empty, it is sent after your last exam (${fmtDate(lastExam)}).` : ' Left empty, it is sent after your last exam.'}
+          </p>
         </div>
         <ModalActions onCancel={onClose} submitLabel="Save changes" />
       </form>
