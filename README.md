@@ -15,15 +15,17 @@ You need Node 18 or newer. Use Chrome or Edge, because the meeting minutes use t
 ## How the app works
 
 1. **Login or sign up** with an Islington College email like `NP01CP4A240001@islingtoncollege.edu.np`. Sign up also asks for your course, semester and London Met ID.
-   Demo accounts (password `unisync123`): Abhishek `NP01CP4A240014`, Ananyaa `NP01CP4A240021`, Karan `NP01NT4A240033`, Riya `NP01MM4A240007`, Dev `NP01AI4A240042`. On the login page you can just click a name.
+   There are no ready made accounts. Every student signs up with their own college email.
 2. **Upload your modules folder** (one sub folder per module works best).
-3. **Upload your exam schedule folder**.
-4. **Analysis**: the app reads the PDF, DOCX, TXT and CSV files and finds the modules, deadlines and exams. For each coursework it checks if it is group work ("groups of 4", "pair project", "group presentation") or individual work, and shows why.
-5. **Review**: you can edit, untick or switch any item between Individual and Group, then confirm.
+3. **Upload your class timetable** (the weekly routine with the day, time, module and room of every class). The timetable and the exam routine can also be a photo (JPG or PNG). A photo is read by the AI backend, so the backend has to be running for it.
+4. **Upload your exam schedule folder**.
+5. **Analysis**: the app reads the PDF, PowerPoint (.pptx), DOCX, TXT and CSV files and finds the modules, deadlines, weekly classes and exams. Coursework that is listed without a date (like "Coursework 2 (Group Coursework), Week 24") is also found, with a guessed date you are asked to check. For each coursework it checks if it is group work ("groups of 4", "pair project", "group presentation") or individual work, and shows why.
+6. **Review**: you can edit, untick or switch any item between Individual and Group, then confirm.
    * Individual work goes on your individual board.
    * Group work becomes a group project with starter tasks spread out before the deadline.
-   * You can't make projects by hand. If a classmate already uploaded the same brief, you join their project instead of making a copy.
-6. **Dashboard** with 3 pages: Individual, Group and Schedule.
+   * You can't make projects by hand. Every student who uploads gets their own project for a piece of group coursework, named with the module name (like "Application Development · Coursework 2"). The rest of the group is added with **+ Member**. If the student you add has an untouched copy of the same project, that copy is removed.
+   * **Class reminders**: at 20:00 each evening (you can change the time on the Schedule page) UniSync shows the classes you have the next day with the time and the room, in a pop up, in the bell and as a browser notification if you allow it. This works while UniSync is open in a browser tab. The Schedule page shows the timetable and lets you add or remove classes.
+7. **Dashboard** with 4 pages: Individual, Group, Study and Schedule.
 
 Sample files to try it with are in `sample-uploads/` (a `Modules` folder and an `Exam Schedule` folder).
 
@@ -42,7 +44,67 @@ Sample files to try it with are in `sample-uploads/` (a `Modules` folder and an 
 | Meeting minutes or meeting log (one person per call), posted to the chat after the call | `components/call/callActions.js`, `services/meetingNotes.js` |
 | Notifications for exams, deadlines and calls | `components/layout/Header.jsx` |
 | Online status (green dot) | `store/presence.js` |
+| Progress charts (how much is completed, who did how much) | `components/common/Donut.jsx`, `components/team/GroupProgress.jsx`, `lib/progress.js` |
+| Semester feedback report (sent at the end of the semester, PDF download) | `components/report/SemesterReport.jsx`, `services/semesterReport.js`, `lib/pdf.js` |
+| Canvas (group and individual) for class, database, activity and sequence diagrams and a work breakdown | `components/canvas/CanvasBoard.jsx`, `components/canvas/shapes.jsx`, `components/canvas/canvas.css` |
 | Light and dark mode | `components/common/ThemeToggle.jsx` |
+| Study quiz: multiple choice questions written by AI (Gemini) from lecture slides, tutorials and workshops | `components/study/StudyView.jsx`, `services/quiz.js`, `services/ai.js`, `services/textExtract.js`, `backend/main.py` |
+
+### Progress charts
+
+* On the **Group** page click **Progress**. The first chart shows all tasks by column (To Do, In Progress, Review, Completed). The second chart shows who did how much, as a share of the completed tasks or of the assigned tasks.
+* A task counts for the member it is assigned to, not for the person who dragged it.
+* The table under the charts shows assigned, completed, overdue, sub-tasks, comments and actions for every member.
+* The **Individual** page has the same Board, Progress and Canvas tabs. Its Progress page shows your tasks by column, which modules your completed tasks are in, and a table for every module (tasks, completed, overdue, on time).
+* The charts are drawn with plain SVG (`Donut.jsx`), no chart package.
+* When a task is moved to Completed the app saves the time (`doneAt`), so the report can tell if it was finished on time.
+
+### Study quiz (multiple choice questions)
+
+* The **Study** page is where you upload your **lecture slides, tutorial sheets and workshop sheets**, after you have made your account. Press **Upload study material** and choose the files (PowerPoint .pptx, PDF, Word .docx or text). Deadlines and exam dates are not used here, they stay on the boards.
+* In the upload popup you can pick the module and the kind of material, or leave both on "work it out". The module is found from a module code or name in the file name or on the first slides.
+* **The questions are written by AI (Google Gemini).** `services/textExtract.js` reads the file slide by slide in the browser (`extractSlides`). `services/quiz.js` sends the text of the slides to the small Python backend in the `backend` folder (`services/ai.js` -> `POST /api/ai/quiz`). The backend puts the text in a prompt, Gemini writes the questions with 4 options, the correct answer and a short explanation, and the backend checks them before sending them back. The API key is only in `backend/.env`. See `backend/README.md` for how to set it up and run it.
+* The upload popup says if AI questions are on or off. After you answer a question the explanation is shown under it.
+* **Basic questions (fallback).** If the backend is not running, has no key, or Gemini fails for a file, the app still makes questions in the browser with patterns in the text, and tells you. These are much weaker. They work in 2 steps:
+  1. **Facts.** It collects definitions ("Normalisation is the process of ..."), slide titles with their bullet points, and questions in a sheet that have an "Answer:" line.
+  2. **Questions.** Every fact becomes a question with 4 options. The right option comes from the fact, the 3 wrong options from other facts of the same module.
+* **Modules:** the Study page shows every one of your modules, also the ones with no material yet. Pick a module and press **Upload** to add its slides (the upload popup already has that module selected). A file that ended up under "General" can be put under the right module with the dropdown on the file in **Study material**; its questions and old quiz answers move with it.
+* **Your modules table:** for each module it shows the files, the questions, how many you answered, your quiz score and a status (No material yet, No quiz taken, Needs work, Getting there, Strong). The module with the lowest score is marked, so you can see where you are behind. A quiz of all modules counts each question for its own module.
+* **Taking a quiz:** pick a module and how many questions, then **Start quiz**. Choosing an option (click, or keys 1 to 4) checks it straight away: the right answer turns green, a wrong pick turns red, and the slide it came from is shown. At the end you see your score and every question with your answer and the correct answer. **Retry wrong ones** starts a quiz with only the questions you missed.
+* Questions you have not seen, or got wrong before, are picked first. Finished quizzes are saved under **Past quizzes** and can be opened again.
+* **Semester feedback report:** quiz results are part of the report. It shows the quiz average, the number of quizzes, the score for each module, and feedback lines about the best and weakest quiz module.
+* Removing a file under **Study material** also removes its questions. Uploading the same file twice does not make copies.
+* AI can still make mistakes. If the questions of a file are not good, remove the file under **Study material** and upload it again to get new ones.
+
+### Semester feedback report
+
+* The report shows individual tasks completed, the on-time rate, completion for each module, your share in each group, your study quiz scores and a short list of what went well, what to improve and what to do next semester.
+* The feedback sentences come from rules in `services/semesterReport.js`. Later the backend can write them with an AI model.
+* **When you get it:** the report of the current semester is not shown on the Schedule page. The day after the semester ends it is sent to you: a pop up, a notification in the bell and a browser notification if you allowed them. The semester ends on the date you set in Edit profile ("Semester ends on"), or on the date of your last exam if you leave that empty.
+* **Download PDF** saves the report as an A4 PDF file. The PDF is made in the browser (`lib/pdf.js`), no library is needed.
+* Reports of semesters you closed are listed on the Schedule page under "Past semester reports".
+* **Year long and semester long modules:** every module is marked "1 semester" or "Year long". It is read from the slides ("Duration: Year Long", "Semester Long Module") and can be changed on the Review step and on the Schedule page. When a semester is closed, a 1 semester module is finished and a year long module continues for 1 more semester. The report says which modules continue.
+* **Close semester and save report** keeps a copy under Past semesters, moves you to the next semester and stops completed tasks from being counted again. Tasks that are not finished carry over.
+
+### Group canvas
+
+* On the **Group** page click **Canvas**. Pick a diagram type at the top of the toolbar, then add shapes (click one, or drag it onto the canvas):
+  * **Class and database**: Class, Table
+  * **Activity diagram**: Start (black dot), Action, Decision (diamond), Fork / join bar, End (dot in a ring)
+  * **Sequence diagram**: Actor, Lifeline
+  * **Planning and notes**: Work item, Note
+  * **Rectangle** is in every diagram type. As a filled box it is a normal box. As "Outline only" it goes behind the other shapes, so it works as a frame (loop, alt, swimlane) with its text in the top left corner. A thin filled rectangle on a lifeline works as an activation box.
+* **Plain text:** double click an empty part of the canvas and type. Enter saves, Shift + Enter makes a new line. Double click the text to edit it again. Text size and colour are in the side panel.
+* **Download and open again:** **Download PNG** saves the whole diagram as a picture. The shapes and lines are also saved inside the same PNG file (as JSON in a text block of the file, see `lib/pngData.js`), so the picture is the editable file too. **Open file** takes that PNG and puts the shapes back on the canvas, even after the canvas was cleared. If the canvas already has shapes, the opened ones are added to the right. The picture is made with `html-to-image`, kept at version 1.11.11 because newer versions draw the lines wrong. Only the original file works: a screenshot, or a picture sent through WhatsApp or Messenger, has the saved diagram removed.
+* **Changing the size:** click a shape, then drag one of its corners. "Reset size" in the side panel puts it back. Lifeline length and fork / join length are picked in the side panel.
+* The **Individual** page has its own Canvas tab with the same tools. It is saved under your user id (`canvas[userId]`) and only you can see it. There, **Tasks to WBS** builds the breakdown from your modules and individual tasks.
+* Drag from the dot on the side of a shape to another shape to connect them. Pick the kind of line (association, inheritance, one to many and so on) in the toolbar, or click a line to change it. Click a line to type text on it, like `login()` or `[yes]`.
+* Lines for activity diagrams: flow arrow, line with a dot at the end, arrow with a dot at the end. Lines for sequence diagrams: message, async message, reply (dashed), lost message (arrow to a dot) and found message (dot to an arrow).
+* For a sequence diagram put the actors and lifelines in one row at the same height. Each lifeline has a connection dot every 30px down its dashed line, so a message drawn between dots at the same height is a straight horizontal arrow. Change the lifeline length in the side panel.
+* Click a shape to edit its text and colour in the side panel. Delete with the Delete key or the button.
+* **Tasks to WBS** builds a work breakdown structure from the tasks on the board (project, category, tasks).
+* The canvas is saved as JSON on the project (`project.canvas = { nodes, edges }`) and every member sees changes live. Each change only touches the shape or line that was edited, so two members working on different shapes do not overwrite each other. If two members edit the same shape at the same moment, the last change wins.
+* The canvas uses React Flow (`@xyflow/react`). It is loaded only when the Canvas tab is opened.
 
 ### Live activity fix
 
@@ -55,19 +117,23 @@ Before, the feed showed the person the task was given to, not the person who mov
 * Each person's own mic is turned into text, so every line has the right name. Anyone can also type notes.
 * When the last person leaves, the minutes or log are posted to the group chat as a card (view, copy, download). The person taking notes can also click **Stop and post now**.
 
-## Demo with two tabs
+## Showing it with two tabs
 
 1. Open two tabs of the app in the same Chrome window.
-2. Tab 1: log in as Abhishek, upload `sample-uploads/Modules` then `sample-uploads/Exam Schedule`, click Analyse files, check and confirm. 5 group projects are made.
-3. Tab 2: log in as Riya and upload the same folders. Riya joins the same 5 projects.
-4. Both open **Group**. Abhishek drags a task and Riya's tab shows "Abhishek moved…" straight away.
-5. Abhishek clicks **Start call**, Riya gets a popup and clicks **Join**. Try **Share screen**.
-6. Abhishek turns on **Minutes → Meeting minutes**. Riya's button is now locked.
+2. Tab 1: log in as the first student, upload `sample-uploads/Modules` then `sample-uploads/Exam Schedule`, click Analyse files, check and confirm. 5 group projects are made.
+3. Tab 2: log in as the second student and upload the same folders. They get their own 5 projects. In tab 1 press + Member and add the second student, who is then moved into the first student's project.
+4. Both open **Group**. The first student drags a task and the other tab shows the move straight away.
+5. The first student clicks **Start call**, the second gets a popup and clicks **Join**. Try **Share screen**.
+6. The first student turns on **Minutes → Meeting minutes**. The other student's button is now locked.
 7. Talk (or type notes), then both leave. The minutes show up in the group chat.
 
 Tip: use headphones or mute one tab, because both tabs use the same mic and speakers.
 
-## Connecting the Python backend later
+## The AI backend (already made)
+
+The `backend` folder is a small Python FastAPI server that writes the quiz questions with Google Gemini. It is set with `VITE_AI_URL` in `.env`. Steps are in `backend/README.md`.
+
+## Connecting the rest of the Python backend later
 
 Everything that needs a server goes through `src/services/api.js` and `src/store/db.js`.
 
@@ -80,28 +146,33 @@ POST /api/auth/login
 POST /api/ai/parse-modules      (files)
 POST /api/ai/parse-exams        (files + modules list)
 POST /api/ai/meeting-notes      ({ mode, transcript, events, manualNotes, meta })
-WS   /ws/projects/{id}          (board changes, feed, chat, online status, call signalling)
+POST /api/ai/semester-feedback  (report numbers -> feedback sentences, optional)
+WS   /ws/projects/{id}          (board changes, canvas changes, feed, chat, online status, call signalling)
 ```
 
 3. Right now the data is kept in `localStorage` and tabs talk to each other with `storage` events and `BroadcastChannel`. With the backend, change `update()` in `store/db.js` to call the API, and change the `BroadcastChannel` in `store/presence.js` and `components/call/useCall.js` to the WebSocket.
-4. For calls between different networks, add a TURN server to the `ICE_SERVERS` list in `useCall.js`.
+4. The canvas JSON can be stored in a JSON column of the project table. For many people editing the same shape at once, a CRDT library such as Yjs can be added on top of the WebSocket.
+5. For calls between different networks, add a TURN server to the `ICE_SERVERS` list in `useCall.js`.
 
 ## Folders
 
 ```
 src/
-  App.jsx          login -> setup -> dashboard
+  App.jsx          login -> setup -> dashboard (individual, group, study, schedule)
   store/           saved data (db.js), demo data, online status
-  services/        api.js, file reading, meeting notes
-  lib/             constants and date helpers
+  services/        api.js, file reading, meeting notes, semester report
+  lib/             constants, date helpers and progress numbers
   components/
     auth/          login and sign up
     onboarding/    folder upload and review
     layout/        top bar and notifications
     personal/      individual board
-    team/          group board and task panel
+    team/          group board, task panel and progress charts
+    canvas/        group canvas and its shapes
+    report/        semester feedback report
+    study/         study quiz page
     chat/          group chat
     call/          video call and meeting minutes
     profile/       profile and schedule page
-    common/        shared parts (kanban, activity feed, icons, popups)
+    common/        shared parts (kanban, activity feed, donut chart, icons, popups)
 ```
