@@ -13,6 +13,8 @@
   --soft: #f8fafc; --soft2: #eef1f7; --soft3: #f1f5f9; --track: #e2e8f0;
   --tint: #eef2ff; --tint-green: #ecfdf5; --tint-rose: #fff1f2; --field: #ffffff;
   --hero: linear-gradient(135deg, #eef2ff, #f5f3ff); --flash: #e0e7ff;
+  /* chart colours for the 4 kanban columns */
+  --st-todo: #94a3b8; --st-progress: #4f46e5; --st-review: #d97706; --st-done: #059669;
   color-scheme: light;
 }
 html, body { margin: 0; }
@@ -76,6 +78,7 @@ button:disabled { cursor: not-allowed; }
   --soft: #182238; --soft2: #1b2640; --soft3: #1f2a44; --track: #26314a;
   --tint: #1e2350; --tint-green: #0f2a22; --tint-rose: #2e1520; --field: #0f1628;
   --hero: linear-gradient(135deg, #1e2350, #26184a); --flash: #2a2f6b;
+  --st-todo: #64748b; --st-progress: #818cf8; --st-review: #f59e0b; --st-done: #10b981;
   color-scheme: dark;
 }
 [data-theme="dark"] .bg-white { background-color: var(--panel); }
@@ -114,3 +117,20 @@ body, .card, header, .field { transition: background-color .25s ease, border-col
 }
 
 body:has(.onboard-bar) .theme-toggle { bottom: 88px; }
+
+/* printing the semester report: only the report is printed, in light colours */
+@media print {
+  #root { display: none; }
+  :root[data-theme="dark"] {
+    --bg: #ffffff; --panel: #ffffff; --ink: #0f172a; --muted: #64748b; --line: #e6e8f0;
+    --soft: #f8fafc; --soft2: #eef1f7; --soft3: #f1f5f9; --track: #e2e8f0;
+    --st-todo: #94a3b8; --st-progress: #4f46e5; --st-review: #d97706; --st-done: #059669;
+    color-scheme: light;
+  }
+  body { background: #fff; }
+  .report-overlay { position: static; display: block; background: none; padding: 0; overflow: visible; }
+  .report-sheet { max-width: none; padding: 0; border-radius: 0; animation: none; }
+  .report-block { break-inside: avoid; }
+  .no-print { display: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

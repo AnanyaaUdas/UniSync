@@ -1,9 +1,11 @@
-// makes group projects from the group coursework found in the pdfs.
-// students can't create projects themselves. if a classmate already
-// uploaded the same brief, you get added to their project instead of
-// making a new one, so the whole group ends up on the same board.
+// makes group projects from the group coursework found in the files.
+// students can't create projects themselves. every student who uploads
+// gets their own project for a piece of group coursework, and the rest
+// of the group is added with "+ Member". (before, everyone who uploaded
+// the same brief joined the same project, but the whole class has the
+// same slides, so the whole class ended up in one group.)
 import { uid, fmtDate, dayFromNow, daysTo } from '../lib/format';
-import { logTeam, userById, displayName } from '../store/db';
+import { logTeam } from '../store/db';
 
 // same module code + same title (ignoring small words) = same project
 function projectKey(code, title) {
@@ -61,32 +63,39 @@ function starterTasks(title, kind, due, me) {
 }
 
 // items = [{ title, due, kind, groupSize, source, module: { code, name } }]
-// returns how many projects were made and how many were joined
+// "Application Development · Coursework 2"
+const projectName = (item) => `${item.module.name || item.module.code ? (item.module.name || item.module.code) + ' · ' : ''}${item.title}`.slice(0, 70);
+
+// "CS6004NI · group coursework · due 14 Mar 2027"
+function projectSub(item) {
+  const size = item.groupSize ? `groups of ${item.groupSize}` : 'group coursework';
+  return `${item.module.name && item.module.code ? item.module.code + ' · ' : ''}${size} · due ${fmtDate(item.due)}`;
+}
+
+// returns how many projects were made and how many i already had
 export function applyTeamProjects(d, me, items) {
   let created = 0;
   let joined = 0;
 
   items.forEach((item) => {
     const key = projectKey(item.module.code, item.title);
-    const existing = d.projects.find((p) => p.key === key);
+    // only a project i am already in counts, so uploading the same file
+    // again does not make it twice
+    const mine = d.projects.find((p) => p.key === key && p.members.includes(me));
 
-    if (existing) {
-      if (!existing.members.includes(me)) {
-        existing.members.push(me);
-        logTeam(d, existing.id, me, `joined the project (matched from **${item.source || 'their coursework PDF'}**)`);
-        existing.chat.push({ id: uid('c'), type: 'system', who: me, txt: `${displayName(userById(d, me))} joined the group.`, at: Date.now() });
-      }
+    if (mine) {
+      mine.name = projectName(item);
+      mine.sub = projectSub(item);
       joined++;
       return;
     }
 
     const id = uid('p');
-    const size = item.groupSize ? `groups of ${item.groupSize}` : 'group coursework';
     d.projects.push({
       id,
       key,
-      name: `${item.module.code ? item.module.code + ' · ' : ''}${item.title}`.slice(0, 70),
-      sub: `${item.module.name || 'Group coursework'} · ${size} · due ${fmtDate(item.due)}`,
+      name: projectName(item),
+      sub: projectSub(item),
       groupSize: item.groupSize ? Number(item.groupSize) : null,
       members: [me],
       tasks: starterTasks(item.title, item.kind, item.due, me),

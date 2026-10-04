@@ -26,10 +26,43 @@ function save(data) {
   }
 }
 
+// the app used to have 5 ready made demo students. they are gone now, so
+// anything they left in the saved data is taken out once
+const OLD_DEMO = ['ab', 'an', 'ka', 'ri', 'de'];
+const DEMO_EMAILS = /^NP01(CP4A240014|CP4A240021|NT4A240033|MM4A240007|AI4A240042)@islingtoncollege\.edu\.np$/i;
+
+function removeDemoStudents(data) {
+  const gone = new Set(data.users.filter((u) => OLD_DEMO.includes(u.id) && DEMO_EMAILS.test(u.email)).map((u) => u.id));
+  if (!gone.size) return false;
+
+  data.users = data.users.filter((u) => !gone.has(u.id));
+  // everything that is stored for each student
+  Object.values(data).forEach((part) => {
+    if (part && typeof part === 'object' && !Array.isArray(part)) gone.forEach((id) => delete part[id]);
+  });
+  // groups: take them out, and remove a group that has nobody left
+  data.projects = (data.projects || []).filter((p) => {
+    p.members = p.members.filter((id) => !gone.has(id));
+    if (!p.members.length) return false;
+    p.tasks.forEach((t) => {
+      if (gone.has(t.assignee)) t.assignee = p.members[0];
+    });
+    p.feed = p.feed.filter((f) => !gone.has(f.who));
+    p.chat = p.chat.filter((c) => !gone.has(c.who));
+    return true;
+  });
+  return true;
+}
+
 let db = read();
 if (!db) {
   db = seedDB();
   save(db);
+} else if (removeDemoStudents(db)) {
+  save(db);
+}
+if (sessionStorage.getItem(SESSION_KEY) && !db.users.some((u) => u.id === sessionStorage.getItem(SESSION_KEY))) {
+  sessionStorage.removeItem(SESSION_KEY); // was logged in as a demo student
 }
 
 const listeners = new Set();
@@ -53,12 +86,6 @@ export function update(change) {
 }
 
 export const getDB = () => db;
-
-export function resetDemo() {
-  localStorage.removeItem(KEY);
-  sessionStorage.removeItem(SESSION_KEY);
-  location.reload();
-}
 
 const subscribe = (fn) => {
   listeners.add(fn);

@@ -1,0 +1,46 @@
+/* styles for the canvas (react flow). the shapes use the same colour
+   variables as the rest of the app so they follow light and dark mode */
+.react-flow { --xy-background-color: var(--soft); --xy-edge-stroke: #64748b; --xy-edge-stroke-selected: var(--brand); --xy-edge-label-background-color: var(--panel); --xy-edge-label-color: var(--ink); --xy-minimap-background-color: var(--panel); --xy-controls-button-background-color: var(--panel); --xy-controls-button-color: var(--ink); --xy-controls-button-border-color: var(--line); font-family: inherit; }
+.react-flow__edge-text { font-size: 11px; font-weight: 700; }
+.react-flow__minimap, .react-flow__controls { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.react-flow__handle { width: 9px; height: 9px; background: var(--panel); border: 2px solid var(--cv, var(--brand)); opacity: 0; transition: opacity .15s; }
+.react-flow__node:hover .react-flow__handle, .react-flow__node.selected .react-flow__handle, .react-flow.connecting .react-flow__handle { opacity: 1; }
+.cv-shape { width: 100%; height: 100%; box-sizing: border-box; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); font-size: 12px; overflow: hidden; }
+.cv-shape.on { border-color: var(--cv); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cv) 28%, transparent); }
+.cv-head { color: #fff; font-weight: 800; font-size: 13px; padding: 7px 10px; text-align: center; overflow-wrap: anywhere; }
+.cv-rows { padding: 7px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.cv-split { border-top: 1px solid var(--line); }
+.cv-task { padding: 9px 11px; }
+.cv-title { font-weight: 700; font-size: 12.5px; line-height: 1.3; overflow-wrap: anywhere; }
+.cv-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
+.cv-task .cv-text { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
+.cv-note { padding: 10px 12px; border-color: color-mix(in srgb, var(--cv) 45%, var(--line)); font-size: 12.5px; }
+/* activity and sequence diagram shapes */
+.cv-free { position: relative; color: var(--ink); font-size: 12.5px; }
+.cv-start.on, .cv-end.on, .cv-bar.on, .cv-life.on { outline: 2px solid var(--brand); outline-offset: 4px; }
+.cv-start { width: 30px; height: 30px; border-radius: 50%; background: var(--ink); --cv: var(--ink); }
+.cv-end { width: 36px; height: 36px; border-radius: 50%; border: 2.5px solid var(--ink); background: var(--panel); display: grid; place-items: center; --cv: var(--ink); }
+.cv-end > span { width: 20px; height: 20px; border-radius: 50%; background: var(--ink); }
+.cv-action { width: 100%; height: 100%; box-sizing: border-box; display: grid; place-items: center; padding: 8px 14px; border: 2px solid; border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); font-weight: 700; text-align: center; line-height: 1.3; overflow-wrap: anywhere; }
+.cv-decision { width: 100%; height: 100%; }
+.cv-decision > svg, .cv-decision > span { pointer-events: none; }
+.cv-decision > svg { position: absolute; inset: 0; filter: drop-shadow(0 4px 8px rgba(15,23,42,.12)); }
+.cv-decision > span { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 22%; text-align: center; font-weight: 700; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; }
+.cv-bar { border-radius: 3px; background: var(--ink); --cv: var(--ink); }
+.cv-life { width: 130px; display: flex; flex-direction: column; align-items: center; }
+.cv-life-head { width: 100%; box-sizing: border-box; padding: 9px 8px; border: 2px solid; border-radius: 10px; background: var(--panel); font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; z-index: 1; }
+.cv-life-line { position: absolute; bottom: 0; left: 50%; border-left: 2px dashed; opacity: .7; }
+.cv-life .react-flow__handle { opacity: 0; }
+.cv-life:hover .react-flow__handle, .react-flow.connecting .cv-life .react-flow__handle { opacity: 1; }
+body:has(.react-flow) .theme-toggle { bottom: 88px; }
+.cv-rect { width: 100%; height: 100%; box-sizing: border-box; border: 2px solid; border-radius: 6px; background: var(--panel); display: grid; place-items: center; padding: 8px; text-align: center; font-weight: 600; line-height: 1.3; white-space: pre-wrap; overflow: hidden; overflow-wrap: anywhere; }
+.cv-rect.cv-frame { background: transparent; display: block; padding: 0; text-align: left; }
+.cv-rect.cv-frame > span { display: inline-block; padding: 3px 10px; font-size: 11.5px; font-weight: 700; background: var(--panel); border-right: 2px solid; border-bottom: 2px solid; border-bottom-right-radius: 8px; }
+/* corner handles for resizing */
+.react-flow__resize-control.cv-resize-line { border-color: var(--brand); opacity: .5; }
+.react-flow__resize-control.cv-resize-dot { width: 9px; height: 9px; border-radius: 2px; background: var(--panel); border: 2px solid var(--brand); }
+/* plain text typed on the canvas */
+.cv-plain { min-width: 20px; padding: 2px 4px; font-weight: 600; line-height: 1.35; white-space: pre; --cv: var(--brand); }
+.cv-plain.on { outline: 1.5px dashed var(--brand); outline-offset: 3px; border-radius: 4px; }
+.cv-plain .cv-text { white-space: pre; }
+.cv-plain textarea { display: block; field-sizing: content; min-width: 90px; min-height: 1.35em; margin: 0; padding: 0; border: none; outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 3px; background: var(--panel); color: inherit; font: inherit; line-height: inherit; resize: none; overflow: hidden; white-space: pre; }

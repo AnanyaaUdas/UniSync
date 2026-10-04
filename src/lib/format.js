@@ -58,3 +58,9 @@ export function initialsOf(name = '') {
 }
 
 export const firstName = (name = '') => name.split(' ')[0];
+
+// files downloaded from the college site have a long id in the name, like
+// CS6004NI_WEEK01_LECTURE_b7dfab7c-8c7f-43f6-847e-bb785eb8367a_213129_.pptx
+// this takes the id out: CS6004NI_WEEK01_LECTURE.pptx
+export const shortFile = (name = '') =>
+  name.replace(/_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(_\d+)?_?(?=\.[a-z0-9]+$|$)/i, '');
