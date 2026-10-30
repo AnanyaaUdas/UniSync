@@ -1,16 +1,21 @@
-node_modules
-dist
-.env
-
+# packages and build
 node_modules/
-__MACOSX/
-._*
-.DS_Store
+dist/
+
+# keys and local settings
 .env
+backend/.env
 
 # python backend
 .venv/
 __pycache__/
+backend/ai_cache/
+backend/data/
 
-backend/quiz_cache/
-backend/.env
+# mac and editor files
+.DS_Store
+._*
+__MACOSX/
+
+# files saved by the Claude desktop app
+Claude outputs/
