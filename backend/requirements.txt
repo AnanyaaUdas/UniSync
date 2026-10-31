@@ -2,3 +2,7 @@ fastapi
 uvicorn[standard]
 google-genai
 python-dotenv
+scikit-learn
+pandas
+openpyxl
+joblib
