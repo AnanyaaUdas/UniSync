@@ -9,7 +9,7 @@ const bytes = (text) => new TextEncoder().encode(text);
 
 // pages = [{ data: Uint8Array (jpeg), w, h }] where w and h are the pixels of the picture.
 // returns a Blob with the pdf
-export function pdfFromJpegs(pages) {
+function pdfFromJpegs(pages) {
   const parts = [];
   const offsets = []; // where every object starts, the pdf needs this at the end
   let size = 0;
@@ -58,7 +58,7 @@ export function pdfFromJpegs(pages) {
 }
 
 // how tall one page of the picture can be, for a picture that is `width` pixels wide
-export const pageHeightFor = (width) => Math.floor((width * (A4.h - MARGIN * 2)) / (A4.w - MARGIN * 2));
+const pageHeightFor = (width) => Math.floor((width * (A4.h - MARGIN * 2)) / (A4.w - MARGIN * 2));
 
 // cuts a tall canvas into A4 pages. `breaks` are the y positions (in canvas
 // pixels) where a block ends, so a page is not cut through the middle of a block
