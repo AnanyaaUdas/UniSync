@@ -16,9 +16,6 @@ export function seedDB() {
     calls: {},
     reports: {}, // saved semester feedback reports
     reportClosed: {}, // ids of tasks already counted in a saved report
-    questions: {}, // each student's quiz questions (multiple choice)
-    studyFiles: {}, // the lecture, tutorial and workshop files the questions came from
-    quizResults: {}, // each student's finished quizzes
     canvas: {}, // each student's own canvas (group canvases are on the project)
     projects: [], // each project also keeps its tasks, chat, feed and canvas
   };
