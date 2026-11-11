@@ -1,11 +1,11 @@
 // talks to the ai backend (the backend folder, python + fastapi).
-// the backend writes the quiz questions with google gemini and reads the
-// text of photos (a timetable or exam routine sent as a picture). the api
-// key is kept there, never in the browser.
+// the backend reads the text of photos (a timetable or exam routine sent
+// as a picture) with google gemini. the api key is kept there, never in
+// the browser.
 //
 // the address comes from VITE_AI_URL in the .env file, for example
 // http://localhost:8000. when it is empty, or the backend is not running,
-// the app makes basic questions in the browser instead (see quiz.js).
+// photos can not be read and the student is told why (see textExtract.js).
 const AI_URL = (import.meta.env.VITE_AI_URL || '').replace(/\/$/, '');
 
 // stops waiting after some seconds
@@ -13,33 +13,6 @@ function withTimeout(seconds) {
   const stop = new AbortController();
   setTimeout(() => stop.abort(), seconds * 1000);
   return stop.signal;
-}
-
-// { on: true, model } when ai questions can be made, { on: false, why } when not
-export async function aiStatus() {
-  if (!AI_URL) return { on: false, why: 'VITE_AI_URL is not set in the .env file.' };
-  try {
-    const res = await fetch(`${AI_URL}/api/health`, { signal: withTimeout(4) });
-    const data = await res.json();
-    if (!data.ai) return { on: false, why: 'The backend is running but has no Gemini API key (backend/.env).' };
-    return { on: true, model: data.model };
-  } catch {
-    return { on: false, why: `The AI backend is not running at ${AI_URL}.` };
-  }
-}
-
-// sends the text of the slides and gets back
-// [{ text, options: [4], answer, explain, slide }]
-export async function aiQuestions({ slides, module, material, file }) {
-  const res = await fetch(`${AI_URL}/api/ai/quiz`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slides, module, material, file }),
-    signal: withTimeout(120),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || `The AI backend answered with an error (${res.status}).`);
-  return data.questions;
 }
 
 // makes a photo smaller before it is sent (a phone photo can be 5 MB).

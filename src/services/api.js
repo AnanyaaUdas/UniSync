@@ -11,15 +11,14 @@
 //   POST /api/ai/parse-timetable timetable files -> weekly classes
 //   POST /api/ai/meeting-notes   call transcript -> minutes or log
 //
-// the study quiz is different: it already has its own small backend (the
-// backend folder), set with VITE_AI_URL. see services/ai.js
+// reading the text on a photo is different: it already has its own small
+// backend (the backend folder), set with VITE_AI_URL. see services/ai.js
 import { parseModuleFiles, parseExamFiles } from './aiParser';
 import { parseTimetableFiles } from './timetable';
 import { generateMeetingNotes } from './meetingNotes';
-import { makeQuiz } from './quiz';
 
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-export const DEMO_MODE = !API_URL;
+const DEMO_MODE = !API_URL;
 
 async function http(path, options = {}) {
   const isForm = options.body instanceof FormData;
@@ -78,13 +77,6 @@ export const api = {
       return http('/api/ai/parse-timetable', { method: 'POST', body: form });
     }
     return parseTimetableFiles(files, onProgress, modules);
-  },
-
-  // options = { modules, mod, material, ai, known }, see makeQuiz in quiz.js.
-  // the files are read in the browser, the ai backend writes the questions.
-  // returns { questions, files }
-  async quiz(files, options = {}) {
-    return makeQuiz(files, options);
   },
 
   async meetingNotes(data) {
