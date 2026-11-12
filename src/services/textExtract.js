@@ -9,7 +9,7 @@
 // extractText(file)   -> all the text as one string (used by aiParser.js)
 // extractRows(file)   -> the lines, with a table row on one line (used by timetable.js)
 // extractSlides(file) -> the text slide by slide: [{ n, title, lines }]
-//                        (used by quiz.js to make quiz questions)
+//                        (used by aiParser.js)
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { aiImageText } from './ai';
@@ -18,7 +18,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const extension = (name) => (name.split('.').pop() || '').toLowerCase();
 
-export const isImage = (file) => ['jpg', 'jpeg', 'png', 'webp'].includes(extension(file.name));
+const isImage = (file) => ['jpg', 'jpeg', 'png', 'webp'].includes(extension(file.name));
 
 // why the last photo could not be read, shown to the student
 export const imageErrors = new Map();

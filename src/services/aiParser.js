@@ -431,7 +431,7 @@ export async function parseModuleFiles(files, onProgress = () => {}) {
 
 const TIME_RANGE = /\b(\d{1,2}[:.]\d{2})\s*(am|pm)?\s*(?:-|–|—|to)\s*(\d{1,2}[:.]\d{2})\s*(am|pm)?/i;
 const ONE_TIME = /\b(\d{1,2}[:.]\d{2})\s*(am|pm)?\b/i;
-const ROOM = /\b(hall|room|lab|block|venue|rm)\s*[:\-]?\s*([A-Z0-9][A-Z0-9-]{0,5})\b/i;
+const ROOM = /\b(hall|room|lab|block|venue|rm)\s*[:-]?\s*([A-Z0-9][A-Z0-9-]{0,5})\b/i;
 const COURSEWORK_WORDS = /\b(due|deadline|submit|submission|hand-?in|assignment|coursework|project|presentation|report|essay|portfolio)\b/i;
 const EXAM_WORDS = /\b(exam|examination|final paper|paper [ivx\d]+|mid-?term exam|board exam)\b/i;
 
