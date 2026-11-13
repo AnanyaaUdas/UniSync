@@ -1,9 +1,8 @@
 // makes group projects from the group coursework found in the files.
 // students can't create projects themselves. every student who uploads
 // gets their own project for a piece of group coursework, and the rest
-// of the group is added with "+ Member". (before, everyone who uploaded
-// the same brief joined the same project, but the whole class has the
-// same slides, so the whole class ended up in one group.)
+// of the group is added with "+ Member". the whole class has the same
+// slides, so joining by file would put the whole class in one group.
 import { uid, fmtDate, dayFromNow, daysTo } from '../lib/format';
 import { logTeam } from '../store/db';
 
