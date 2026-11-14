@@ -1,13 +1,12 @@
 // builds the feedback report a student gets at the end of a semester.
 // it only uses what is already in the app: individual tasks, group tasks,
-// deadlines, exams and the study quizzes. the feedback sentences are made with simple
+// deadlines and exams. the feedback sentences are made with simple
 // rules for now. later the python backend can write them with an ai model
 // (POST /api/ai/semester-feedback).
 import { userById, displayName, logPersonal } from '../store/db';
 import { SEMS, COLS } from '../lib/constants';
 import { uid } from '../lib/format';
 import { percent, finishedOnTime, isOverdue } from '../lib/progress';
-import { quizStats } from './quiz';
 
 // tasks that were already counted in an older report are skipped
 const closedIds = (d, me) => new Set(d.reportClosed?.[me] || []);
@@ -81,10 +80,6 @@ export function buildReport(d, me) {
     meetings: groups.reduce((n, g) => n + g.meetings, 0),
   };
 
-  // ---------- study quizzes ----------
-  const quiz = quizStats((d.quizResults?.[me] || []).filter((r) => !closed.has(r.id)));
-  quiz.bank = (d.questions?.[me] || []).length; // questions waiting on the study page
-
   const report = {
     semester: user.sem,
     student: { name: user.name, dept: user.dept, lmuId: user.lmuId || '', email: user.email },
@@ -92,7 +87,6 @@ export function buildReport(d, me) {
     individual,
     groups,
     group,
-    quiz,
     exams: (d.exams[me] || []).length,
   };
   report.feedback = writeFeedback(report);
@@ -154,26 +148,6 @@ function writeFeedback(r) {
   if (r.groups.length && !r.group.meetings) next.push('Turn on meeting minutes in your group calls so decisions and action items are saved.');
   if (r.group.meetings) strengths.push(`Your groups saved minutes for ${r.group.meetings} ${r.group.meetings === 1 ? 'meeting' : 'meetings'}.`);
 
-  // study quizzes
-  const quiz = r.quiz;
-  if (quiz.taken) {
-    const line = `You answered ${quiz.correct} of ${quiz.answered} study quiz questions correctly (${quiz.pct}%) across ${quiz.taken} ${quiz.taken === 1 ? 'quiz' : 'quizzes'}.`;
-    if (quiz.pct >= 75) strengths.push(line);
-    else if (quiz.pct < 50) improve.push(line + ' Read the slides again before the exams.');
-    else improve.push(line + ' Retry the questions you got wrong.');
-
-    // best and weakest module in the quizzes (5 or more answers each)
-    const tried = quiz.modules.filter((m) => m.answered >= 5).sort((a, b) => b.pct - a.pct);
-    const weak = tried[tried.length - 1];
-    if (tried.length >= 2 && tried[0].pct > weak.pct) strengths.push(`Your best quiz module was ${tried[0].name} with ${tried[0].pct}% correct.`);
-    if (weak && weak.pct < 60) {
-      improve.push(`Your quiz score in ${weak.name} was ${weak.pct}% (${weak.correct} of ${weak.answered} correct).`);
-      next.push(`Go over the ${weak.name} slides and take its quiz again.`);
-    }
-  } else if (quiz.bank) {
-    next.push(`You have ${quiz.bank} quiz questions on the Study page but did not take a quiz. Use them to revise before the exams.`);
-  }
-
   // year long modules go on after this semester
   ind.modules.filter((m) => m.yearLong).forEach((m) => {
     const left = m.total - m.done;
@@ -220,9 +194,7 @@ export function closeSemester(db, me, report) {
     ...(db.solo[me] || []).filter((t) => t.status === 'done').map((t) => t.id),
     ...db.projects.filter((p) => p.members.includes(me)).flatMap((p) => p.tasks.filter((t) => t.col === 'done').map((t) => t.id)),
   ];
-  // finished quizzes are counted once too
-  const quizzes = (db.quizResults?.[me] || []).map((result) => result.id);
-  db.reportClosed[me] = [...new Set([...(db.reportClosed[me] || []), ...finished, ...quizzes])];
+  db.reportClosed[me] = [...new Set([...(db.reportClosed[me] || []), ...finished])];
 
   if (db.semEnd) delete db.semEnd[me]; // the next semester gets its own end date
 

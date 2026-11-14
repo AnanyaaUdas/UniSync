@@ -11,7 +11,7 @@ const DAY_RE = /\b(sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const TIME_RE = /(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?\s*(?:-|–|—|to)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?/i;
 const TYPE_RE = /\b(lecture|tutorial|workshop|lab|practical|seminar)\b/i;
-const ROOM_RE = /\b(hall|room|lab|block|venue|rm|lt|tr|sr|lr)\s*[:\-]?\s*\d[\w-]{0,5}\b|\b(hall|room|block)\s+[a-z]\b/i;
+const ROOM_RE = /\b(hall|room|lab|block|venue|rm|lt|tr|sr|lr)\s*[:-]?\s*\d[\w-]{0,5}\b|\b(hall|room|block)\s+[a-z]\b/i;
 const PERSON_RE = /^(mr|mrs|ms|miss|dr|er|prof|sir)\b\.?/i;
 
 const pad = (n) => String(n).padStart(2, '0');
