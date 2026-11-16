@@ -74,7 +74,7 @@ function getNotifications(d, me, now) {
   return list;
 }
 
-const TABS = [['personal', 'Individual'], ['team', 'Group'], ['study', 'Study'], ['schedule', 'Schedule']];
+const TABS = [['personal', 'Individual'], ['team', 'Group'], ['schedule', 'Schedule']];
 
 export default function Header({ me, view, setView, projId, setProjId, onUpload, openChat, chatCount, onJoinCall, onReport }) {
   const d = useDB();
