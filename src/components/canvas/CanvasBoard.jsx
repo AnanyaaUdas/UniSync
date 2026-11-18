@@ -135,7 +135,7 @@ function Canvas({ saved, change, log, breakdown, name, shared }) {
       return before ? { ...before, ...toFlowNode(n) } : toFlowNode(n);
     }));
     setEdges((old) => saved.edges.map((e) => ({ ...drawLine(e), selected: old.find((o) => o.id === e.id)?.selected })));
-  }, [savedText]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [savedText]);
 
   // ---------- shapes ----------
 
@@ -291,7 +291,7 @@ function Canvas({ saved, change, log, breakdown, name, shared }) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [nodes, savedText, editingId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [nodes, savedText, editingId]);
 
   const editShape = (id, key, value) => change((canvas) => {
     const node = canvas.nodes.find((n) => n.id === id);
