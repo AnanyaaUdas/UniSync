@@ -191,7 +191,7 @@ export default function useCall({ projectId, me, meName, meColor }) {
       clearInterval(timer);
       window.removeEventListener('beforeunload', onClose);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   async function hangUp() {
     send({ type: 'leave' });
