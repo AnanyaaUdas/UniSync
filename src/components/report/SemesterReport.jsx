@@ -16,8 +16,7 @@ export default function SemesterReport({ me, saved, onClose }) {
   const d = useDB();
   const r = saved ? saved.report : buildReport(d, me);
   const ind = r.individual;
-  const quiz = r.quiz || { taken: 0, modules: [] }; // reports saved before quizzes existed have none
-  const hasData = ind.total > 0 || r.groups.length > 0 || quiz.taken > 0;
+  const hasData = ind.total > 0 || r.groups.length > 0;
   const lastSemester = SEMS.indexOf(r.semester) === SEMS.length - 1;
   const sheet = useRef();
   const [making, setMaking] = useState(false);
@@ -78,7 +77,6 @@ export default function SemesterReport({ me, saved, onClose }) {
     ['Finished on time', ind.timed ? `${ind.onTimePct}%` : 'n/a', ind.timed ? `${ind.onTime} of ${ind.timed}` : 'no dated tasks yet'],
     ['Group tasks completed by you', `${r.group.done}/${r.group.assigned}`, `${percent(r.group.done, r.group.assigned)}%`],
     ['Overdue now', ind.overdue + r.group.overdue, 'individual and group'],
-    ['Study quiz average', quiz.taken ? `${quiz.pct}%` : 'n/a', quiz.taken ? `${quiz.taken} ${quiz.taken === 1 ? 'quiz' : 'quizzes'} taken` : 'no quiz taken'],
   ];
 
   return createPortal(
@@ -170,29 +168,6 @@ export default function SemesterReport({ me, saved, onClose }) {
               </section>
             )}
 
-            {quiz.taken > 0 && (
-              <section className="mt-7">
-                <h2 className="font-bold text-[15px]">Study quizzes</h2>
-                <p className="text-[12.5px] muted mt-0.5">
-                  {quiz.correct} of {quiz.answered} questions correct in {quiz.taken} {quiz.taken === 1 ? 'quiz' : 'quizzes'} · average {quiz.pct}% · best quiz {quiz.best}%
-                </p>
-                <div className="grid md:grid-cols-2 gap-x-6 gap-y-3 mt-3">
-                  {quiz.modules.map((m) => (
-                    <div key={m.code + m.name} className="report-block">
-                      <div className="flex items-baseline gap-2 text-[13px]">
-                        <span className="font-semibold truncate flex-1">{m.code ? `${m.code} · ${m.name}` : m.name}</span>
-                        <span className="font-bold tabular-nums">{m.correct}/{m.answered}</span>
-                        <span className="muted tabular-nums w-10 text-right">{m.pct}%</span>
-                      </div>
-                      <div className="h-2 rounded-full mt-1.5" style={{ background: 'var(--track)' }}>
-                        <div className="h-2 rounded-full" style={{ width: `${m.pct}%`, background: m.color }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
             <section className="mt-7 grid md:grid-cols-3 gap-4">
               <FeedbackList title="What went well" items={r.feedback.strengths} empty="Complete more tasks to see your strengths here." />
               <FeedbackList title="What to improve" items={r.feedback.improve} empty="Nothing stands out. Good work." />
@@ -200,7 +175,7 @@ export default function SemesterReport({ me, saved, onClose }) {
             </section>
 
             <p className="text-[11.5px] muted mt-6">
-              This report is made from your UniSync data only: tasks, deadlines, group activity, saved meeting minutes and study quiz scores. It is not a grade and does not include marks from the college.
+              This report is made from your UniSync data only: tasks, deadlines, group activity and saved meeting minutes. It is not a grade and does not include marks from the college.
             </p>
           </>
         )}
