@@ -25,7 +25,7 @@ You need Node 18 or newer. Use Chrome or Edge, because the meeting minutes use t
    * Group work becomes a group project with starter tasks spread out before the deadline.
    * You can't make projects by hand. Every student who uploads gets their own project for a piece of group coursework, named with the module name (like "Application Development · Coursework 2"). The rest of the group is added with **+ Member**. If the student you add has an untouched copy of the same project, that copy is removed.
    * **Class reminders**: at 20:00 each evening (you can change the time on the Schedule page) UniSync shows the classes you have the next day with the time and the room, in a pop up, in the bell and as a browser notification if you allow it. This works while UniSync is open in a browser tab. The Schedule page shows the timetable and lets you add or remove classes.
-7. **Dashboard** with 4 pages: Individual, Group, Study and Schedule.
+7. **Dashboard** with 3 pages: Individual, Group and Schedule.
 
 Sample files to try it with are in `sample-uploads/` (a `Modules` folder and an `Exam Schedule` folder).
 
@@ -44,41 +44,24 @@ Sample files to try it with are in `sample-uploads/` (a `Modules` folder and an 
 | Meeting minutes or meeting log (one person per call), posted to the chat after the call | `components/call/callActions.js`, `services/meetingNotes.js` |
 | Notifications for exams, deadlines and calls | `components/layout/Header.jsx` |
 | Online status (green dot) | `store/presence.js` |
-| Progress charts (how much is completed, who did how much) | `components/common/Donut.jsx`, `components/team/GroupProgress.jsx`, `lib/progress.js` |
+| Progress charts (how much is completed, who did how much) | `components/common/Donut.jsx`, `components/common/ProgressTable.jsx`, `components/team/GroupProgress.jsx`, `components/personal/PersonalProgress.jsx`, `lib/progress.js` |
 | Semester feedback report (sent at the end of the semester, PDF download) | `components/report/SemesterReport.jsx`, `services/semesterReport.js`, `lib/pdf.js` |
 | Canvas (group and individual) for class, database, activity and sequence diagrams and a work breakdown | `components/canvas/CanvasBoard.jsx`, `components/canvas/shapes.jsx`, `components/canvas/canvas.css` |
 | Light and dark mode | `components/common/ThemeToggle.jsx` |
-| Study quiz: multiple choice questions written by AI (Gemini) from lecture slides, tutorials and workshops | `components/study/StudyView.jsx`, `services/quiz.js`, `services/ai.js`, `services/textExtract.js`, `backend/main.py` |
+| Reading a photo of the timetable or exam routine with AI (Gemini) | `services/ai.js`, `services/textExtract.js`, `backend/main.py` |
 
 ### Progress charts
 
-* On the **Group** page click **Progress**. The first chart shows all tasks by column (To Do, In Progress, Review, Completed). The second chart shows who did how much, as a share of the completed tasks or of the assigned tasks.
+* On the **Group** page click **Progress**. The first chart shows all tasks by column (To Do, In Progress, Review, Completed). The second chart shows who did how much, as a share of the completed tasks.
 * A task counts for the member it is assigned to, not for the person who dragged it.
-* The table under the charts shows assigned, completed, overdue, sub-tasks, comments and actions for every member.
-* The **Individual** page has the same Board, Progress and Canvas tabs. Its Progress page shows your tasks by column, which modules your completed tasks are in, and a table for every module (tasks, completed, overdue, on time).
+* The table under the charts shows assigned, completed and overdue tasks for every member, with a progress bar.
+* The **Individual** page has the same Board, Progress and Canvas tabs. Its Progress page shows your tasks by column and a table for every module (tasks, completed, overdue).
 * The charts are drawn with plain SVG (`Donut.jsx`), no chart package.
 * When a task is moved to Completed the app saves the time (`doneAt`), so the report can tell if it was finished on time.
 
-### Study quiz (multiple choice questions)
-
-* The **Study** page is where you upload your **lecture slides, tutorial sheets and workshop sheets**, after you have made your account. Press **Upload study material** and choose the files (PowerPoint .pptx, PDF, Word .docx or text). Deadlines and exam dates are not used here, they stay on the boards.
-* In the upload popup you can pick the module and the kind of material, or leave both on "work it out". The module is found from a module code or name in the file name or on the first slides.
-* **The questions are written by AI (Google Gemini).** `services/textExtract.js` reads the file slide by slide in the browser (`extractSlides`). `services/quiz.js` sends the text of the slides to the small Python backend in the `backend` folder (`services/ai.js` -> `POST /api/ai/quiz`). The backend puts the text in a prompt, Gemini writes the questions with 4 options, the correct answer and a short explanation, and the backend checks them before sending them back. The API key is only in `backend/.env`. See `backend/README.md` for how to set it up and run it.
-* The upload popup says if AI questions are on or off. After you answer a question the explanation is shown under it.
-* **Basic questions (fallback).** If the backend is not running, has no key, or Gemini fails for a file, the app still makes questions in the browser with patterns in the text, and tells you. These are much weaker. They work in 2 steps:
-  1. **Facts.** It collects definitions ("Normalisation is the process of ..."), slide titles with their bullet points, and questions in a sheet that have an "Answer:" line.
-  2. **Questions.** Every fact becomes a question with 4 options. The right option comes from the fact, the 3 wrong options from other facts of the same module.
-* **Modules:** the Study page shows every one of your modules, also the ones with no material yet. Pick a module and press **Upload** to add its slides (the upload popup already has that module selected). A file that ended up under "General" can be put under the right module with the dropdown on the file in **Study material**; its questions and old quiz answers move with it.
-* **Your modules table:** for each module it shows the files, the questions, how many you answered, your quiz score and a status (No material yet, No quiz taken, Needs work, Getting there, Strong). The module with the lowest score is marked, so you can see where you are behind. A quiz of all modules counts each question for its own module.
-* **Taking a quiz:** pick a module and how many questions, then **Start quiz**. Choosing an option (click, or keys 1 to 4) checks it straight away: the right answer turns green, a wrong pick turns red, and the slide it came from is shown. At the end you see your score and every question with your answer and the correct answer. **Retry wrong ones** starts a quiz with only the questions you missed.
-* Questions you have not seen, or got wrong before, are picked first. Finished quizzes are saved under **Past quizzes** and can be opened again.
-* **Semester feedback report:** quiz results are part of the report. It shows the quiz average, the number of quizzes, the score for each module, and feedback lines about the best and weakest quiz module.
-* Removing a file under **Study material** also removes its questions. Uploading the same file twice does not make copies.
-* AI can still make mistakes. If the questions of a file are not good, remove the file under **Study material** and upload it again to get new ones.
-
 ### Semester feedback report
 
-* The report shows individual tasks completed, the on-time rate, completion for each module, your share in each group, your study quiz scores and a short list of what went well, what to improve and what to do next semester.
+* The report shows individual tasks completed, the on-time rate, completion for each module, your share in each group and a short list of what went well, what to improve and what to do next semester.
 * The feedback sentences come from rules in `services/semesterReport.js`. Later the backend can write them with an AI model.
 * **When you get it:** the report of the current semester is not shown on the Schedule page. The day after the semester ends it is sent to you: a pop up, a notification in the bell and a browser notification if you allowed them. The semester ends on the date you set in Edit profile ("Semester ends on"), or on the date of your last exam if you leave that empty.
 * **Download PDF** saves the report as an A4 PDF file. The PDF is made in the browser (`lib/pdf.js`), no library is needed.
@@ -131,7 +114,7 @@ Tip: use headphones or mute one tab, because both tabs use the same mic and spea
 
 ## The AI backend (already made)
 
-The `backend` folder is a small Python FastAPI server that writes the quiz questions with Google Gemini. It is set with `VITE_AI_URL` in `.env`. Steps are in `backend/README.md`.
+The `backend` folder is a small Python FastAPI server that reads the text on a photo of a timetable or exam routine with Google Gemini. It is set with `VITE_AI_URL` in `.env`. Steps are in `backend/README.md`.
 
 ## Connecting the rest of the Python backend later
 
@@ -158,8 +141,8 @@ WS   /ws/projects/{id}          (board changes, canvas changes, feed, chat, onli
 
 ```
 src/
-  App.jsx          login -> setup -> dashboard (individual, group, study, schedule)
-  store/           saved data (db.js), demo data, online status
+  App.jsx          login -> setup -> dashboard (individual, group, schedule)
+  store/           saved data (db.js), empty start data, online status
   services/        api.js, file reading, meeting notes, semester report
   lib/             constants, date helpers and progress numbers
   components/
@@ -170,7 +153,6 @@ src/
     team/          group board, task panel and progress charts
     canvas/        group canvas and its shapes
     report/        semester feedback report
-    study/         study quiz page
     chat/          group chat
     call/          video call and meeting minutes
     profile/       profile and schedule page
