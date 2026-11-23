@@ -56,20 +56,11 @@ export function statusSlices(tasks, stageOf) {
 export function memberStats(project) {
   return project.members.map((id) => {
     const mine = project.tasks.filter((t) => t.assignee === id);
-    const count = (col) => mine.filter((t) => t.col === col).length;
-    const subs = mine.flatMap((t) => t.subs);
     return {
       id,
       assigned: mine.length,
-      todo: count('todo'),
-      progress: count('progress'),
-      review: count('review'),
-      done: count('done'),
+      done: mine.filter((t) => t.col === 'done').length,
       overdue: mine.filter((t) => isOverdue(t, t.col)).length,
-      subsDone: subs.filter((s) => s.d).length,
-      subsTotal: subs.length,
-      comments: project.tasks.reduce((n, t) => n + t.comments.filter((c) => c.who === id).length, 0),
-      actions: project.feed.filter((f) => f.who === id).length,
     };
   });
 }
