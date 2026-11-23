@@ -1,5 +1,5 @@
 // main app. shows login first, then the setup (upload folders) page,
-// then the dashboard with the individual, group, study and schedule pages
+// then the dashboard with the individual, group and schedule pages
 import React, { useEffect, useRef, useState } from 'react';
 import AuthPage from './components/auth/AuthPage';
 import Onboarding from './components/onboarding/Onboarding';
@@ -7,7 +7,6 @@ import Header from './components/layout/Header';
 import PersonalView from './components/personal/PersonalView';
 import TeamView from './components/team/TeamView';
 import ProfileView from './components/profile/ProfileView';
-import StudyView from './components/study/StudyView';
 import ChatDrawer from './components/chat/ChatDrawer';
 import CallRoom from './components/call/CallRoom';
 import ThemeToggle from './components/common/ThemeToggle';
@@ -44,7 +43,7 @@ export default function App() {
 function Dashboard({ me }) {
   const d = useDB();
   const myProjects = d.projects.filter((p) => p.members.includes(me));
-  const [view, setView] = useState('personal'); // personal, team, study or schedule
+  const [view, setView] = useState('personal'); // personal, team or schedule
   const [projId, setProjId] = useState(myProjects[0]?.id || null);
   const [chatOpen, setChatOpen] = useState(false);
   const [callProj, setCallProj] = useState(null);
@@ -54,7 +53,7 @@ function Dashboard({ me }) {
   // pick the first project once some are made
   useEffect(() => {
     if (!projId && myProjects[0]) setProjId(myProjects[0].id);
-  }, [myProjects.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [myProjects.length]);
 
   function openCall(id) {
     setProjId(id);
@@ -87,7 +86,6 @@ function Dashboard({ me }) {
       {view === 'personal' && <PersonalView me={me} goSchedule={() => setView('schedule')} />}
       {/* the key makes react start fresh when the project changes */}
       {view === 'team' && <TeamView key={'team-' + projId} me={me} projId={projId} openChat={() => setChatOpen(true)} startCall={openCall} onUpload={() => setUploading(true)} />}
-      {view === 'study' && <StudyView me={me} />}
       {view === 'schedule' && <ProfileView me={me} onUpload={() => setUploading(true)} />}
 
       {chatOpen && view === 'team' && project && <ChatDrawer me={me} projectId={project.id} onClose={() => setChatOpen(false)} onCall={() => openCall(project.id)} />}
@@ -118,7 +116,7 @@ function useReportReady(me, openReport) {
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('UniSync: your semester report is ready', { body: `${sem} has ended. Open UniSync to download the PDF.` });
     }
-  }, [d, me, now]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d, me, now]);
 }
 
 // the evening reminder: "tomorrow you have this class at this time in this room".
@@ -154,7 +152,7 @@ function useClassReminders(me, openSchedule) {
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(list.length === 1 ? 'UniSync: 1 class tomorrow' : `UniSync: ${list.length} classes tomorrow`, { body: lines.join('\n') });
     }
-  }, [d, me, now]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d, me, now]);
 }
 
 // shows a small popup when a group member (in another tab) does something,
@@ -205,5 +203,5 @@ function useTeammateToasts(me, openCall, openProject) {
         }
       }
     });
-  }, [d, me]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d, me]);
 }
